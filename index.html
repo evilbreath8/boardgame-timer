@@ -82,14 +82,27 @@
       -webkit-tap-highlight-color:transparent; transition:border-color .15s,background .15s;
     }
     .time-opt.selected { border-color:var(--accent); background:rgba(124,106,247,.15); color:var(--accent); }
-    .time-custom { display:flex; align-items:center; gap:8px; margin-top:9px; }
+    .time-custom { display:flex; align-items:center; gap:6px; margin-top:9px; flex-wrap:wrap; }
     .time-custom input {
-      width:70px; background:var(--bg); border:1.5px solid var(--border);
-      border-radius:10px; padding:9px 12px; color:var(--text);
+      width:62px; background:var(--bg); border:1.5px solid var(--border);
+      border-radius:10px; padding:9px 10px; color:var(--text);
       font-family:'Space Mono',monospace; font-size:1rem; text-align:center;
     }
     .time-custom input:focus { outline:none; border-color:var(--accent); }
-    .time-custom label { color:var(--muted); font-size:.85rem; }
+    .time-custom label { color:var(--muted); font-size:.8rem; margin-right:6px; }
+
+    /* mode switch */
+    .mode-switch { display:flex; gap:8px; margin-bottom:14px; }
+    .mode-opt {
+      flex:1; background:var(--surface); border:1.5px solid var(--border); border-radius:13px;
+      padding:12px 10px; text-align:center; cursor:pointer;
+      -webkit-tap-highlight-color:transparent; transition:border-color .15s,background .15s;
+    }
+    .mode-opt.selected { border-color:var(--accent); background:rgba(124,106,247,.12); }
+    .mode-opt-icon { font-size:1.4rem; display:block; margin-bottom:4px; }
+    .mode-opt-title { font-weight:700; font-size:.85rem; }
+    .mode-opt-sub { font-size:.7rem; color:var(--muted); margin-top:2px; line-height:1.3; }
+    .mode-opt.selected .mode-opt-title { color:var(--accent); }
 
     /* ── GAME ── */
     .game-header {
@@ -132,6 +145,11 @@
     .player-timer { font-family:'Space Mono',monospace; font-size:1.9rem; font-weight:700; color:var(--text); transition:color .3s; }
     .player-card.warn   .player-timer { color:var(--accent2); }
     .player-card.danger .player-timer { color:var(--danger); }
+    .player-timer-wrap { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+    .player-total-indicative {
+      font-family:'Space Mono',monospace; font-size:.68rem; color:var(--muted);
+      letter-spacing:.02em; white-space:nowrap;
+    }
     .control-bar { display:flex; gap:9px; padding:9px 12px 18px; flex-shrink:0; }
 
     /* ── FICHES PAGE ── */
@@ -227,6 +245,29 @@
     .action-edit-chip button { background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; }
     .action-add-row { display:flex; gap:7px; margin-top:6px; }
     .action-add-row input { flex:1; }
+
+    /* ── FIN DE PARTIE ── */
+    .finished-overlay {
+      position:fixed; inset:0; background:rgba(12,11,22,.94); backdrop-filter:blur(8px);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:300; gap:16px; padding:24px; opacity:0; pointer-events:none; transition:opacity .25s;
+    }
+    .finished-overlay.show { opacity:1; pointer-events:all; }
+    .finished-icon { font-size:3.2rem; }
+    .finished-title { font-size:1.4rem; font-weight:700; color:var(--accent); text-align:center; }
+    .finished-sub { color:var(--muted); font-size:.85rem; text-align:center; max-width:280px; }
+    .stats-list { width:100%; max-width:340px; display:flex; flex-direction:column; gap:8px; }
+    .stat-row {
+      background:var(--surface); border:1px solid var(--border); border-radius:13px;
+      padding:11px 15px; display:flex; align-items:center; gap:11px;
+    }
+    .stat-row .stat-avatar { font-size:1.3rem; flex-shrink:0; }
+    .stat-row .stat-name { flex:1; font-weight:600; font-size:.92rem; }
+    .stat-row .stat-time { font-family:'Space Mono',monospace; color:var(--accent2); font-size:.92rem; font-weight:700; }
+    .stat-row .stat-bar-wrap { width:100%; height:5px; background:var(--bg); border-radius:3px; overflow:hidden; margin-top:6px; }
+    .stat-row .stat-bar { height:100%; border-radius:3px; }
+    .stat-row-inner { flex:1; min-width:0; }
+    .finished-actions { display:flex; gap:10px; width:100%; max-width:340px; margin-top:6px; }
   </style>
 </head>
 <body>
@@ -257,8 +298,27 @@
     </div>
 
     <div class="setup-section">
-      <div class="section-label">Temps par joueur / tour</div>
+      <div class="section-label">Mode de chronométrage</div>
+      <div class="mode-switch" id="mode-switch">
+        <div class="mode-opt selected" data-mode="global" onclick="selectMode('global')">
+          <span class="mode-opt-icon">♟️</span>
+          <span class="mode-opt-title">Temps global</span>
+          <span class="mode-opt-sub">Capital de temps pour toute la partie</span>
+        </div>
+        <div class="mode-opt" data-mode="turn" onclick="selectMode('turn')">
+          <span class="mode-opt-icon">⏳</span>
+          <span class="mode-opt-title">Par tour</span>
+          <span class="mode-opt-sub">Le temps se réinitialise à chaque tour</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-section">
+      <div class="section-label" id="time-section-label">Temps par joueur / tour</div>
       <div class="time-options" id="time-options">
+        <div class="time-opt" data-sec="15">15 s</div>
+        <div class="time-opt" data-sec="30">30 s</div>
+        <div class="time-opt" data-sec="45">45 s</div>
         <div class="time-opt selected" data-sec="60">1 min</div>
         <div class="time-opt" data-sec="120">2 min</div>
         <div class="time-opt" data-sec="180">3 min</div>
@@ -267,7 +327,9 @@
       </div>
       <div class="time-custom">
         <input type="number" id="custom-min" placeholder="2" min="1" max="99">
-        <label>min personnalisé</label>
+        <label>min</label>
+        <input type="number" id="custom-sec" placeholder="90" min="1" max="599">
+        <label>sec</label>
       </div>
     </div>
 
@@ -298,7 +360,20 @@
   <div class="control-bar">
     <button class="btn btn-secondary" id="btn-pause" onclick="togglePause()">⏸ Pause</button>
     <button class="btn btn-primary" id="btn-next" onclick="nextPlayer()">Suivant ▶</button>
+    <button class="btn btn-secondary" onclick="finishGame()" title="Terminer">🏁</button>
     <button class="btn btn-danger" onclick="resetConfirm()">⏹</button>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: Fin de partie ═══ -->
+<div class="finished-overlay" id="finished-overlay">
+  <div class="finished-icon">🏆</div>
+  <div class="finished-title">Partie terminée !</div>
+  <div class="finished-sub" id="finished-sub">Temps utilisé par chaque joueur</div>
+  <div class="stats-list" id="stats-list"></div>
+  <div class="finished-actions">
+    <button class="btn btn-secondary" onclick="closeFinished()">Continuer à jouer</button>
+    <button class="btn btn-primary" onclick="resetFromFinished()">Nouvelle partie</button>
   </div>
 </div>
 
@@ -368,6 +443,7 @@ const GAMES_CACHE_KEY = 'bgg_games_v1';
 //  STATE
 // ══════════════════════════════════════════════════════
 let players = [];
+let timerMode = 'global'; // 'global' | 'turn'
 let selectedTime = 60;
 let tourNum = 1;
 let activeIdx = -1;
@@ -376,6 +452,7 @@ let interval = null;
 let editingPlayerIdx = null;
 let tmpEmoji = EMOJIS[0];
 let tmpColor = COLORS[0];
+let gameStartTs = null;
 
 let allGames = [];       // { id, name, thumbnail, minPlayers, maxPlayers, playingTime, yearPublished }
 let fiches = {};         // { [gameId]: { steps:[], actions:[], notes:'' } }
@@ -399,9 +476,9 @@ function switchTab(tab) {
 function initSetup() {
   if (players.length === 0) {
     players = [
-      { name:'Moi',    emoji:'🧙', color:COLORS[0], totalSec:0, elapsed:0 },
-      { name:'Madame', emoji:'👸', color:COLORS[1], totalSec:0, elapsed:0 },
-      { name:'Petit',  emoji:'🦸', color:COLORS[2], totalSec:0, elapsed:0 },
+      { name:'Moi',    emoji:'🧙', color:COLORS[0], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
+      { name:'Madame', emoji:'👸', color:COLORS[1], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
+      { name:'Petit',  emoji:'🦸', color:COLORS[2], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
     ];
   }
   renderSetupList();
@@ -431,11 +508,18 @@ function openAddPlayer() {
 function savePlayer() {
   const name = document.getElementById('input-name').value.trim();
   if (!name) return;
-  const p = { name, emoji:tmpEmoji, color:tmpColor, totalSec:0, elapsed:0 };
+  const p = { name, emoji:tmpEmoji, color:tmpColor, totalSec:0, elapsed:0, totalElapsedAllTurns:0 };
   if (editingPlayerIdx === null) players.push(p);
   else players[editingPlayerIdx] = { ...players[editingPlayerIdx], ...p };
   closeModal('player-modal');
   renderSetupList();
+}
+
+function selectMode(mode) {
+  timerMode = mode;
+  document.querySelectorAll('.mode-opt').forEach(el => el.classList.toggle('selected', el.dataset.mode === mode));
+  const label = document.getElementById('time-section-label');
+  label.textContent = mode === 'global' ? 'Temps par joueur (capital total)' : 'Temps par tour (se réinitialise)';
 }
 
 document.querySelectorAll('.time-opt').forEach(el => {
@@ -444,21 +528,36 @@ document.querySelectorAll('.time-opt').forEach(el => {
     el.classList.add('selected');
     selectedTime = parseInt(el.dataset.sec);
     document.getElementById('custom-min').value = '';
+    document.getElementById('custom-sec').value = '';
   });
 });
 document.getElementById('custom-min').addEventListener('input', e => {
   const v = parseInt(e.target.value);
   if (v > 0) {
     document.querySelectorAll('.time-opt').forEach(el => el.classList.remove('selected'));
+    document.getElementById('custom-sec').value = '';
     selectedTime = v * 60;
+  }
+});
+document.getElementById('custom-sec').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  if (v > 0) {
+    document.querySelectorAll('.time-opt').forEach(el => el.classList.remove('selected'));
+    document.getElementById('custom-min').value = '';
+    selectedTime = v;
   }
 });
 
 function startGame() {
   if (players.length < 2) { alert('Ajoute au moins 2 joueurs !'); return; }
   getAudioCtx(); // débloque l'audio dès la première interaction (requis par les navigateurs)
-  players.forEach(p => { p.totalSec = selectedTime; p.elapsed = 0; });
+  players.forEach(p => {
+    p.totalSec = selectedTime;   // capital (mode global) ou durée d'un tour (mode turn)
+    p.elapsed = 0;                // temps écoulé sur le tour/le capital en cours
+    p.totalElapsedAllTurns = 0;   // cumul indicatif (utilisé en mode turn)
+  });
   tourNum = 1; activeIdx = -1; paused = false;
+  gameStartTs = Date.now();
   clearInterval(interval);
   switchTab('game');
   renderPlayers(); updateTourBar();
@@ -470,13 +569,17 @@ function startGame() {
 function renderPlayers() {
   document.getElementById('players-wrap').innerHTML = players.map((p,i) => {
     const cls = cardClass(p,i);
+    const showTotal = timerMode === 'turn';
     return `<div class="player-card ${cls}" onclick="setActive(${i})" id="card-${i}">
       <div class="player-avatar" style="background:${p.color}22">${p.emoji}</div>
       <div class="player-info">
         <div class="player-name">${p.name}</div>
         <div class="player-status">${i===activeIdx?(paused?'⏸ Pause':'🟢 Son tour'):'En attente'}</div>
       </div>
-      <div class="player-timer" id="timer-${i}">${fmtTime(remaining(p))}</div>
+      <div class="player-timer-wrap">
+        <div class="player-timer" id="timer-${i}">${fmtTime(remaining(p))}</div>
+        ${showTotal ? `<div class="player-total-indicative" id="total-${i}">total : ${fmtTime(p.totalElapsedAllTurns + p.elapsed)}</div>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -500,12 +603,25 @@ function fmtTime(s) {
 
 function setActive(i) {
   if (activeIdx===i) { togglePause(); return; }
-  clearInterval(interval); activeIdx=i; paused=false;
+  clearInterval(interval);
+  if (activeIdx !== -1 && timerMode === 'turn') {
+    const prev = players[activeIdx];
+    prev.totalElapsedAllTurns += prev.elapsed;
+    prev.elapsed = 0;
+  }
+  activeIdx=i; paused=false;
   startTick(); renderPlayers(); updateTourBar();
 }
 
 function nextPlayer() {
   clearInterval(interval);
+  // Avant de changer de joueur : si on était en mode "par tour", on archive le temps du tour
+  // écoulé dans le cumul indicatif, puis on remet le compteur de tour à zéro pour ce joueur.
+  if (activeIdx !== -1 && timerMode === 'turn') {
+    const prev = players[activeIdx];
+    prev.totalElapsedAllTurns += prev.elapsed;
+    prev.elapsed = 0;
+  }
   if (activeIdx===-1) activeIdx=0;
   else {
     activeIdx=(activeIdx+1)%players.length;
@@ -549,6 +665,8 @@ function updateTimerDisplay() {
   players.forEach((p,i)=>{
     const el=document.getElementById(`timer-${i}`);
     if (el) el.textContent=fmtTime(remaining(p));
+    const totalEl=document.getElementById(`total-${i}`);
+    if (totalEl) totalEl.textContent='total : '+fmtTime(p.totalElapsedAllTurns + p.elapsed);
     const card=document.getElementById(`card-${i}`);
     if (card) card.className='player-card '+cardClass(p,i);
   });
@@ -561,7 +679,48 @@ function updateTourBar() {
 
 function changeTour(d) { tourNum=Math.max(1,tourNum+d); document.getElementById('tour-num').textContent=tourNum; }
 
-function resetConfirm() { if(confirm('Retourner à la config ?')) { clearInterval(interval); players.forEach(p=>p.elapsed=0); switchTab('setup'); } }
+function resetConfirm() { if(confirm('Retourner à la config ?')) { clearInterval(interval); players.forEach(p=>{p.elapsed=0; p.totalElapsedAllTurns=0;}); switchTab('setup'); } }
+
+// ══════════════════════════════════════════════════════
+//  FIN DE PARTIE
+// ══════════════════════════════════════════════════════
+function finishGame() {
+  clearInterval(interval);
+  // Calcule le temps total joué par chacun, quel que soit le mode
+  const stats = players.map(p => {
+    const total = timerMode === 'turn'
+      ? p.totalElapsedAllTurns + p.elapsed
+      : p.elapsed; // mode global : temps déjà consommé sur le capital
+    return { ...p, totalPlayed: total };
+  });
+  const maxTime = Math.max(1, ...stats.map(s => s.totalPlayed));
+  document.getElementById('finished-sub').textContent =
+    timerMode === 'turn' ? 'Temps total cumulé par joueur sur tous ses tours' : 'Temps utilisé sur le capital de chacun';
+  document.getElementById('stats-list').innerHTML = stats
+    .sort((a,b) => b.totalPlayed - a.totalPlayed)
+    .map(s => `
+      <div class="stat-row">
+        <span class="stat-avatar">${s.emoji}</span>
+        <div class="stat-row-inner">
+          <div style="display:flex;justify-content:space-between">
+            <span class="stat-name">${s.name}</span>
+            <span class="stat-time">${fmtTime(s.totalPlayed)}</span>
+          </div>
+          <div class="stat-bar-wrap"><div class="stat-bar" style="width:${(s.totalPlayed/maxTime*100).toFixed(0)}%;background:${s.color}"></div></div>
+        </div>
+      </div>`).join('');
+  document.getElementById('finished-overlay').classList.add('show');
+}
+
+function closeFinished() {
+  document.getElementById('finished-overlay').classList.remove('show');
+}
+
+function resetFromFinished() {
+  closeFinished();
+  players.forEach(p => { p.elapsed = 0; p.totalElapsedAllTurns = 0; });
+  switchTab('setup');
+}
 
 // ══════════════════════════════════════════════════════
 //  BGG COLLECTION
