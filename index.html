@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#12111a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Timer Jeu">
+  <title>Timer Jeu de Société</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #12111a; --surface: #1e1c2e; --surface2: #252340;
+      --border: #2e2c44; --accent: #7c6af7; --accent2: #f7a26a;
+      --danger: #f76a6a; --success: #6af7a2; --text: #e8e6f5; --muted: #6e6b8a;
+      --active-glow: 0 0 0 3px rgba(124,106,247,0.5), 0 0 32px rgba(124,106,247,0.2);
+      --warn-glow:   0 0 0 3px rgba(247,162,106,0.5), 0 0 32px rgba(247,162,106,0.2);
+      --danger-glow: 0 0 0 3px rgba(247,106,106,0.5), 0 0 32px rgba(247,106,106,0.2);
+    }
+    body { font-family:'Space Grotesk',sans-serif; background:var(--bg); color:var(--text); height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+
+    /* ── NAV TABS ── */
+    .nav-tabs { display:flex; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; }
+    .nav-tab {
+      flex:1; padding:13px 6px 11px; text-align:center; font-size:.78rem; font-weight:700;
+      letter-spacing:.05em; text-transform:uppercase; color:var(--muted); cursor:pointer;
+      border-bottom:2px solid transparent; transition:color .2s,border-color .2s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .nav-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .nav-tab .tab-icon { display:block; font-size:1.2rem; margin-bottom:2px; }
+
+    /* ── PAGES ── */
+    .page { display:none; flex-direction:column; flex:1; overflow:hidden; }
+    .page.active { display:flex; }
+
+    /* ── SHARED ── */
+    .icon-btn {
+      background:var(--surface2); border:1px solid var(--border); color:var(--text);
+      border-radius:10px; width:40px; height:40px; display:flex; align-items:center;
+      justify-content:center; cursor:pointer; font-size:1.1rem; flex-shrink:0;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .icon-btn:active { background:var(--border); }
+    .btn {
+      flex:1; padding:14px 10px; border-radius:14px; border:none;
+      font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:.9rem;
+      letter-spacing:.04em; cursor:pointer; transition:opacity .15s,transform .1s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .btn:active { transform:scale(.96); opacity:.85; }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-secondary { background:var(--surface2); color:var(--text); border:1.5px solid var(--border); flex:0 0 auto; padding:14px 18px; }
+    .btn-danger { background:var(--danger); color:#fff; flex:0 0 auto; padding:14px 18px; }
+    .btn-sm { flex:0 0 auto; padding:8px 14px; font-size:.8rem; border-radius:10px; }
+
+    /* ── SETUP ── */
+    #page-setup { overflow-y:auto; }
+    .setup-inner { display:flex; flex-direction:column; align-items:center; gap:18px; padding:20px 16px 32px; }
+    .setup-title { font-size:1.5rem; font-weight:700; color:var(--accent); }
+    .setup-sub { color:var(--muted); font-size:.88rem; text-align:center; }
+    .setup-section { width:100%; max-width:400px; }
+    .section-label { font-size:.75rem; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin-bottom:8px; }
+    .setup-players-list { display:flex; flex-direction:column; gap:7px; margin-bottom:8px; }
+    .setup-player-item {
+      background:var(--surface); border:1.5px solid var(--border); border-radius:13px;
+      padding:11px 14px; display:flex; align-items:center; gap:11px;
+    }
+    .setup-player-item .sp-avatar { font-size:1.4rem; }
+    .setup-player-item .sp-name { flex:1; font-weight:600; }
+    .setup-player-item .sp-del { background:none; border:none; color:var(--muted); font-size:1.1rem; cursor:pointer; padding:4px; }
+    .setup-player-item .sp-del:active { color:var(--danger); }
+    .time-options { display:flex; gap:8px; flex-wrap:wrap; }
+    .time-opt {
+      background:var(--surface); border:1.5px solid var(--border); border-radius:10px;
+      padding:9px 16px; font-size:.9rem; font-weight:600; cursor:pointer;
+      -webkit-tap-highlight-color:transparent; transition:border-color .15s,background .15s;
+    }
+    .time-opt.selected { border-color:var(--accent); background:rgba(124,106,247,.15); color:var(--accent); }
+    .time-custom { display:flex; align-items:center; gap:8px; margin-top:9px; }
+    .time-custom input {
+      width:70px; background:var(--bg); border:1.5px solid var(--border);
+      border-radius:10px; padding:9px 12px; color:var(--text);
+      font-family:'Space Mono',monospace; font-size:1rem; text-align:center;
+    }
+    .time-custom input:focus { outline:none; border-color:var(--accent); }
+    .time-custom label { color:var(--muted); font-size:.85rem; }
+
+    /* ── GAME ── */
+    .game-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 16px 10px; border-bottom:1px solid var(--border); flex-shrink:0;
+    }
+    .game-header h1 { font-size:1rem; font-weight:700; color:var(--accent); }
+    .game-header h1 span { color:var(--text); }
+    .tour-bar {
+      display:flex; align-items:center; justify-content:center; gap:14px;
+      padding:9px 16px; border-bottom:1px solid var(--border); flex-shrink:0;
+    }
+    .tour-label { font-size:.75rem; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
+    .tour-count { font-family:'Space Mono',monospace; font-size:1.25rem; font-weight:700; color:var(--accent2); min-width:2ch; text-align:center; }
+    .tour-btn {
+      background:var(--surface2); border:1px solid var(--border); color:var(--text);
+      border-radius:8px; width:30px; height:30px; display:flex; align-items:center;
+      justify-content:center; cursor:pointer; font-size:1rem;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .tour-btn:active { background:var(--border); }
+    #players-wrap { flex:1; display:flex; flex-direction:column; gap:6px; padding:10px 12px 6px; overflow-y:auto; }
+    .player-card {
+      background:var(--surface); border:1.5px solid var(--border); border-radius:16px;
+      padding:13px 16px; display:flex; align-items:center; gap:13px;
+      transition:border-color .2s,box-shadow .2s; cursor:pointer;
+      -webkit-tap-highlight-color:transparent; user-select:none; flex:1; min-height:70px;
+    }
+    .player-card.active { border-color:var(--accent); box-shadow:var(--active-glow); }
+    .player-card.warn   { border-color:var(--accent2); box-shadow:var(--warn-glow); }
+    .player-card.danger { border-color:var(--danger);  box-shadow:var(--danger-glow); }
+    .player-avatar { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0; border:2px solid transparent; transition:border-color .2s; }
+    .player-card.active .player-avatar { border-color:var(--accent); }
+    .player-card.warn   .player-avatar { border-color:var(--accent2); }
+    .player-card.danger .player-avatar { border-color:var(--danger); }
+    .player-info { flex:1; min-width:0; }
+    .player-name { font-weight:700; font-size:1rem; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .player-status { font-size:.72rem; color:var(--muted); }
+    .player-card.active .player-status { color:var(--accent); }
+    .player-timer { font-family:'Space Mono',monospace; font-size:1.9rem; font-weight:700; color:var(--text); transition:color .3s; }
+    .player-card.warn   .player-timer { color:var(--accent2); }
+    .player-card.danger .player-timer { color:var(--danger); }
+    .control-bar { display:flex; gap:9px; padding:9px 12px 18px; flex-shrink:0; }
+
+    /* ── FICHES PAGE ── */
+    #page-fiches { overflow:hidden; }
+    .fiches-header { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .fiches-header h2 { font-size:1rem; font-weight:700; flex:1; }
+    .search-bar {
+      width:100%; background:var(--surface2); border:1.5px solid var(--border);
+      border-radius:11px; padding:10px 14px; color:var(--text);
+      font-family:'Space Grotesk',sans-serif; font-size:.95rem; margin:0 16px 12px;
+    }
+    .search-bar:focus { outline:none; border-color:var(--accent); }
+    .games-list { flex:1; overflow-y:auto; padding:0 12px 20px; }
+    .game-row {
+      background:var(--surface); border:1.5px solid var(--border); border-radius:14px;
+      margin-bottom:8px; overflow:hidden; cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .game-row-header { display:flex; align-items:center; gap:12px; padding:11px 14px; }
+    .game-thumb { width:44px; height:44px; border-radius:9px; object-fit:cover; flex-shrink:0; background:var(--surface2); }
+    .game-thumb-ph { width:44px; height:44px; border-radius:9px; background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
+    .game-info { flex:1; min-width:0; }
+    .game-name { font-weight:700; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .game-meta { font-size:.75rem; color:var(--muted); margin-top:2px; }
+    .game-chevron { color:var(--muted); font-size:.9rem; transition:transform .2s; flex-shrink:0; }
+    .game-row.open .game-chevron { transform:rotate(90deg); }
+    .game-fiche { display:none; padding:0 14px 14px; border-top:1px solid var(--border); }
+    .game-row.open .game-fiche { display:block; }
+    .fiche-section { margin-top:12px; }
+    .fiche-label { font-size:.72rem; color:var(--accent); font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
+    .fiche-steps { display:flex; flex-direction:column; gap:5px; }
+    .fiche-step { display:flex; gap:9px; align-items:flex-start; }
+    .step-num { background:var(--accent); color:#fff; font-size:.7rem; font-weight:700; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+    .step-txt { font-size:.88rem; color:var(--text); flex:1; line-height:1.4; }
+    .fiche-actions { display:flex; flex-wrap:wrap; gap:6px; }
+    .action-chip {
+      background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+      padding:6px 11px; font-size:.82rem; font-weight:600; color:var(--text);
+    }
+    .fiche-notes { font-size:.85rem; color:var(--muted); line-height:1.5; background:var(--surface2); border-radius:10px; padding:10px 12px; }
+    .fiche-edit-btn {
+      width:100%; margin-top:12px; padding:10px; background:none; border:1.5px dashed var(--border);
+      border-radius:10px; color:var(--muted); font-family:'Space Grotesk',sans-serif;
+      font-size:.85rem; cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+    .fiche-edit-btn:active { border-color:var(--accent); color:var(--accent); }
+    .loading-msg { text-align:center; padding:40px 20px; color:var(--muted); }
+    .loading-spinner { font-size:2rem; animation:spin 1s linear infinite; display:block; margin-bottom:12px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .bgg-badge { font-size:.7rem; color:var(--muted); text-align:center; padding:6px; }
+    .bgg-badge a { color:var(--accent); text-decoration:none; }
+
+    /* ── MODAL ── */
+    .overlay {
+      position:fixed; inset:0; background:rgba(12,11,22,.88); backdrop-filter:blur(6px);
+      display:flex; align-items:flex-end; justify-content:center; z-index:200;
+      opacity:0; pointer-events:none; transition:opacity .25s;
+    }
+    .overlay.open { opacity:1; pointer-events:all; }
+    .sheet {
+      background:var(--surface); border:1px solid var(--border); border-radius:24px 24px 0 0;
+      width:100%; max-width:520px; padding:20px 20px 36px;
+      transform:translateY(40px); transition:transform .25s; max-height:90dvh; overflow-y:auto;
+    }
+    .overlay.open .sheet { transform:translateY(0); }
+    .sheet-title { font-size:1.1rem; font-weight:700; margin-bottom:16px; color:var(--accent); }
+    .sheet-close { float:right; background:none; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; margin-top:-2px; }
+    .form-row { margin-bottom:13px; }
+    .form-row label { font-size:.78rem; color:var(--muted); display:block; margin-bottom:5px; letter-spacing:.05em; text-transform:uppercase; }
+    .form-row input, .form-row textarea, .form-row select {
+      width:100%; background:var(--bg); border:1.5px solid var(--border); border-radius:10px;
+      padding:10px 13px; color:var(--text); font-family:'Space Grotesk',sans-serif; font-size:.95rem;
+    }
+    .form-row textarea { min-height:70px; resize:vertical; }
+    .form-row input:focus, .form-row textarea:focus { outline:none; border-color:var(--accent); }
+    .emoji-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-top:5px; }
+    .emoji-opt { font-size:1.5rem; padding:7px; border-radius:9px; background:var(--bg); border:1.5px solid var(--border); text-align:center; cursor:pointer; }
+    .emoji-opt.selected { border-color:var(--accent); background:rgba(124,106,247,.15); }
+    .color-grid { display:flex; gap:9px; flex-wrap:wrap; margin-top:5px; }
+    .color-opt { width:34px; height:34px; border-radius:50%; border:2.5px solid transparent; cursor:pointer; transition:border-color .15s,transform .1s; }
+    .color-opt.selected { border-color:var(--text); transform:scale(1.15); }
+    .sheet-actions { display:flex; gap:10px; margin-top:18px; }
+
+    /* steps editor */
+    .steps-editor { display:flex; flex-direction:column; gap:7px; }
+    .step-edit-row { display:flex; gap:7px; align-items:center; }
+    .step-edit-row input { flex:1; }
+    .step-del-btn { background:none; border:none; color:var(--muted); font-size:1.1rem; cursor:pointer; flex-shrink:0; }
+    .step-del-btn:active { color:var(--danger); }
+    .add-step-btn { background:none; border:1.5px dashed var(--border); border-radius:9px; color:var(--muted); padding:8px; font-family:'Space Grotesk',sans-serif; font-size:.85rem; cursor:pointer; width:100%; margin-top:4px; }
+    .actions-editor { display:flex; flex-wrap:wrap; gap:6px; }
+    .action-edit-chip { display:flex; align-items:center; gap:4px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:5px 10px; font-size:.82rem; }
+    .action-edit-chip button { background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; }
+    .action-add-row { display:flex; gap:7px; margin-top:6px; }
+    .action-add-row input { flex:1; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav class="nav-tabs">
+  <div class="nav-tab active" onclick="switchTab('setup')" id="tab-setup">
+    <span class="tab-icon">⚙️</span>Config
+  </div>
+  <div class="nav-tab" onclick="switchTab('game')" id="tab-game">
+    <span class="tab-icon">⏱️</span>Timer
+  </div>
+  <div class="nav-tab" onclick="switchTab('fiches')" id="tab-fiches">
+    <span class="tab-icon">📋</span>Fiches
+  </div>
+</nav>
+
+<!-- ═══ PAGE CONFIG ═══ -->
+<div class="page active" id="page-setup">
+  <div class="setup-inner">
+    <div class="setup-title">🎲 Timer Jeu</div>
+    <div class="setup-sub">Configure ta partie avant de jouer</div>
+
+    <div class="setup-section">
+      <div class="section-label">Joueurs</div>
+      <div class="setup-players-list" id="setup-list"></div>
+      <button class="btn btn-secondary" style="width:100%;border-radius:12px" onclick="openAddPlayer()">+ Ajouter un joueur</button>
+    </div>
+
+    <div class="setup-section">
+      <div class="section-label">Temps par joueur / tour</div>
+      <div class="time-options" id="time-options">
+        <div class="time-opt selected" data-sec="60">1 min</div>
+        <div class="time-opt" data-sec="120">2 min</div>
+        <div class="time-opt" data-sec="180">3 min</div>
+        <div class="time-opt" data-sec="300">5 min</div>
+        <div class="time-opt" data-sec="0">∞</div>
+      </div>
+      <div class="time-custom">
+        <input type="number" id="custom-min" placeholder="2" min="1" max="99">
+        <label>min personnalisé</label>
+      </div>
+    </div>
+
+    <div class="setup-section">
+      <button class="btn btn-primary" style="width:100%;font-size:1rem" onclick="startGame()">Lancer la partie 🚀</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE TIMER ═══ -->
+<div class="page" id="page-game">
+  <div class="game-header">
+    <h1>🎲 <span>Timer</span></h1>
+    <div style="display:flex;gap:8px">
+      <button class="icon-btn" onclick="resetConfirm()" title="Reconfigurer">↩</button>
+    </div>
+  </div>
+  <div class="tour-bar">
+    <span class="tour-label">Tour</span>
+    <button class="tour-btn" onclick="changeTour(-1)">−</button>
+    <span class="tour-count" id="tour-num">1</span>
+    <button class="tour-btn" onclick="changeTour(1)">+</button>
+    <span class="tour-label" style="margin-left:10px">▸</span>
+    <span class="tour-label" id="active-label" style="color:var(--text);font-weight:700">En attente</span>
+  </div>
+  <div id="players-wrap"></div>
+  <div class="control-bar">
+    <button class="btn btn-secondary" id="btn-pause" onclick="togglePause()">⏸ Pause</button>
+    <button class="btn btn-primary" id="btn-next" onclick="nextPlayer()">Suivant ▶</button>
+    <button class="btn btn-danger" onclick="resetConfirm()">⏹</button>
+  </div>
+</div>
+
+<!-- ═══ PAGE FICHES ═══ -->
+<div class="page" id="page-fiches">
+  <div class="fiches-header">
+    <h2>📋 Fiches de jeu</h2>
+    <button class="icon-btn" onclick="reloadGames()" title="Recharger depuis BGG">↻</button>
+  </div>
+  <input class="search-bar" type="text" id="search-input" placeholder="🔍  Rechercher un jeu…" oninput="filterGames()">
+  <div class="games-list" id="games-list">
+    <div class="loading-msg">
+      <span class="loading-spinner">⚙️</span>
+      Chargement de ta collection BGG…
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Joueur ═══ -->
+<div class="overlay" id="player-modal">
+  <div class="sheet">
+    <div class="sheet-title" id="modal-title">Nouveau joueur <button class="sheet-close" onclick="closeModal('player-modal')">✕</button></div>
+    <div class="form-row"><label>Prénom</label><input type="text" id="input-name" placeholder="Ex: Hugo" maxlength="20"></div>
+    <div class="form-row"><label>Emoji</label><div class="emoji-grid" id="emoji-grid"></div></div>
+    <div class="form-row"><label>Couleur</label><div class="color-grid" id="color-grid"></div></div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeModal('player-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="savePlayer()">Valider</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Fiche éditeur ═══ -->
+<div class="overlay" id="fiche-modal">
+  <div class="sheet">
+    <div class="sheet-title" id="fiche-modal-title">Fiche <button class="sheet-close" onclick="closeModal('fiche-modal')">✕</button></div>
+    <div class="form-row"><label>Ordre du tour (étapes)</label>
+      <div class="steps-editor" id="steps-editor"></div>
+      <button class="add-step-btn" onclick="addStepField()">+ Ajouter une étape</button>
+    </div>
+    <div class="form-row"><label>Actions possibles</label>
+      <div class="actions-editor" id="actions-editor"></div>
+      <div class="action-add-row">
+        <input type="text" id="action-input" placeholder="Ex: Piocher 2 cartes" maxlength="40">
+        <button class="btn btn-secondary btn-sm" onclick="addActionChip()">+</button>
+      </div>
+    </div>
+    <div class="form-row"><label>Notes / rappels</label><textarea id="fiche-notes" placeholder="Ex: Ne pas oublier de scorer en fin de tour…"></textarea></div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeModal('fiche-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveFiche()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════════════
+const EMOJIS = ['🧙','🧝','🧛','🧟','👸','🤴','🦸','🦹','🐉','🦁','🐺','🦊','🐻','🦖','🧙‍♀️','👻','🤖','🎩'];
+const COLORS = ['#7c6af7','#f7a26a','#6af7a2','#f76a6a','#6acff7','#f76aec','#f7e76a','#a26af7'];
+const BGG_USER = 'evilbreath';
+const FICHE_STORAGE_KEY = 'fiches_v1';
+const GAMES_CACHE_KEY = 'bgg_games_v1';
+
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+let players = [];
+let selectedTime = 60;
+let tourNum = 1;
+let activeIdx = -1;
+let paused = false;
+let interval = null;
+let editingPlayerIdx = null;
+let tmpEmoji = EMOJIS[0];
+let tmpColor = COLORS[0];
+
+let allGames = [];       // { id, name, thumbnail, minPlayers, maxPlayers, playingTime, yearPublished }
+let fiches = {};         // { [gameId]: { steps:[], actions:[], notes:'' } }
+let editingGameId = null;
+let tmpSteps = [];
+let tmpActions = [];
+
+// ══════════════════════════════════════════════════════
+//  TAB NAVIGATION
+// ══════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('page-' + tab).classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════
+//  SETUP
+// ══════════════════════════════════════════════════════
+function initSetup() {
+  if (players.length === 0) {
+    players = [
+      { name:'Moi',    emoji:'🧙', color:COLORS[0], totalSec:0, elapsed:0 },
+      { name:'Madame', emoji:'👸', color:COLORS[1], totalSec:0, elapsed:0 },
+      { name:'Petit',  emoji:'🦸', color:COLORS[2], totalSec:0, elapsed:0 },
+    ];
+  }
+  renderSetupList();
+}
+
+function renderSetupList() {
+  document.getElementById('setup-list').innerHTML = players.map((p,i) => `
+    <div class="setup-player-item">
+      <span class="sp-avatar">${p.emoji}</span>
+      <span class="sp-name" style="color:${p.color}">${p.name}</span>
+      <button class="sp-del" onclick="removePlayer(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removePlayer(i) { players.splice(i,1); renderSetupList(); }
+
+function openAddPlayer() {
+  editingPlayerIdx = null;
+  document.getElementById('modal-title').innerHTML = 'Nouveau joueur <button class="sheet-close" onclick="closeModal(\'player-modal\')">✕</button>';
+  document.getElementById('input-name').value = '';
+  tmpEmoji = EMOJIS[0]; tmpColor = COLORS[0];
+  renderEmojiGrid(); renderColorGrid();
+  openModal('player-modal');
+  setTimeout(()=>document.getElementById('input-name').focus(), 300);
+}
+
+function savePlayer() {
+  const name = document.getElementById('input-name').value.trim();
+  if (!name) return;
+  const p = { name, emoji:tmpEmoji, color:tmpColor, totalSec:0, elapsed:0 };
+  if (editingPlayerIdx === null) players.push(p);
+  else players[editingPlayerIdx] = { ...players[editingPlayerIdx], ...p };
+  closeModal('player-modal');
+  renderSetupList();
+}
+
+document.querySelectorAll('.time-opt').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.time-opt').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedTime = parseInt(el.dataset.sec);
+    document.getElementById('custom-min').value = '';
+  });
+});
+document.getElementById('custom-min').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  if (v > 0) {
+    document.querySelectorAll('.time-opt').forEach(el => el.classList.remove('selected'));
+    selectedTime = v * 60;
+  }
+});
+
+function startGame() {
+  if (players.length < 2) { alert('Ajoute au moins 2 joueurs !'); return; }
+  players.forEach(p => { p.totalSec = selectedTime; p.elapsed = 0; });
+  tourNum = 1; activeIdx = -1; paused = false;
+  clearInterval(interval);
+  switchTab('game');
+  renderPlayers(); updateTourBar();
+}
+
+// ══════════════════════════════════════════════════════
+//  GAME / TIMER
+// ══════════════════════════════════════════════════════
+function renderPlayers() {
+  document.getElementById('players-wrap').innerHTML = players.map((p,i) => {
+    const cls = cardClass(p,i);
+    return `<div class="player-card ${cls}" onclick="setActive(${i})" id="card-${i}">
+      <div class="player-avatar" style="background:${p.color}22">${p.emoji}</div>
+      <div class="player-info">
+        <div class="player-name">${p.name}</div>
+        <div class="player-status">${i===activeIdx?(paused?'⏸ Pause':'🟢 Son tour'):'En attente'}</div>
+      </div>
+      <div class="player-timer" id="timer-${i}">${fmtTime(remaining(p))}</div>
+    </div>`;
+  }).join('');
+}
+
+function cardClass(p,i) {
+  if (i!==activeIdx) return '';
+  if (p.totalSec===0) return 'active';
+  const r = remaining(p);
+  if (r<=0) return 'danger';
+  if (r/p.totalSec<0.25) return 'danger';
+  if (r/p.totalSec<0.5) return 'warn';
+  return 'active';
+}
+
+function remaining(p) { return p.totalSec===0 ? Infinity : Math.max(0, p.totalSec-p.elapsed); }
+
+function fmtTime(s) {
+  if (!isFinite(s)) return '∞';
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
+
+function setActive(i) {
+  if (activeIdx===i) { togglePause(); return; }
+  clearInterval(interval); activeIdx=i; paused=false;
+  startTick(); renderPlayers(); updateTourBar();
+}
+
+function nextPlayer() {
+  clearInterval(interval);
+  if (activeIdx===-1) activeIdx=0;
+  else {
+    activeIdx=(activeIdx+1)%players.length;
+    if (activeIdx===0) { tourNum++; }
+  }
+  paused=false; startTick(); renderPlayers(); updateTourBar();
+  vibrate([40]);
+}
+
+function togglePause() {
+  if (activeIdx===-1) return;
+  paused=!paused;
+  if (paused) clearInterval(interval); else startTick();
+  document.getElementById('btn-pause').textContent = paused ? '▶ Reprendre' : '⏸ Pause';
+  renderPlayers();
+}
+
+function startTick() {
+  clearInterval(interval);
+  const p=players[activeIdx];
+  if (p.totalSec===0) return;
+  interval = setInterval(()=>{
+    p.elapsed++;
+    updateTimerDisplay();
+    if (remaining(p)<=0) { clearInterval(interval); vibrate([100,50,100,50,200]); }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  players.forEach((p,i)=>{
+    const el=document.getElementById(`timer-${i}`);
+    if (el) el.textContent=fmtTime(remaining(p));
+    const card=document.getElementById(`card-${i}`);
+    if (card) card.className='player-card '+cardClass(p,i);
+  });
+}
+
+function updateTourBar() {
+  document.getElementById('tour-num').textContent=tourNum;
+  document.getElementById('active-label').textContent=activeIdx>=0?players[activeIdx].name:'En attente';
+}
+
+function changeTour(d) { tourNum=Math.max(1,tourNum+d); document.getElementById('tour-num').textContent=tourNum; }
+
+function resetConfirm() { if(confirm('Retourner à la config ?')) { clearInterval(interval); players.forEach(p=>p.elapsed=0); switchTab('setup'); } }
+
+// ══════════════════════════════════════════════════════
+//  BGG COLLECTION
+// ══════════════════════════════════════════════════════
+async function loadGames() {
+  // Try cache first
+  try {
+    const cached = localStorage.getItem(GAMES_CACHE_KEY);
+    if (cached) {
+      const { ts, data } = JSON.parse(cached);
+      if (Date.now() - ts < 24*3600*1000) { // 24h cache
+        allGames = data;
+        renderGamesList();
+        return;
+      }
+    }
+  } catch(e) {}
+  await fetchBGGCollection();
+}
+
+async function reloadGames() {
+  localStorage.removeItem(GAMES_CACHE_KEY);
+  document.getElementById('games-list').innerHTML = '<div class="loading-msg"><span class="loading-spinner">⚙️</span>Rechargement…</div>';
+  await fetchBGGCollection();
+}
+
+async function fetchBGGCollection() {
+  const url = `https://boardgamegeek.com/xmlapi2/collection?username=${BGG_USER}&own=1&subtype=boardgame&stats=1&excludesubtype=boardgameexpansion`;
+  try {
+    let res = await fetch(url);
+    // BGG renvoie 202 si la requête est en file d'attente → réessayer
+    let tries = 0;
+    while (res.status === 202 && tries < 5) {
+      await new Promise(r=>setTimeout(r, 3000));
+      res = await fetch(url);
+      tries++;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const txt = await res.text();
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(txt, 'text/xml');
+    const items = xml.querySelectorAll('item');
+    allGames = [];
+    items.forEach(item => {
+      const name = item.querySelector('name')?.textContent || '?';
+      const thumb = item.querySelector('thumbnail')?.textContent || '';
+      const stats = item.querySelector('stats');
+      allGames.push({
+        id: item.getAttribute('objectid'),
+        name,
+        thumbnail: thumb.startsWith('//') ? 'https:'+thumb : thumb,
+        minPlayers: stats?.getAttribute('minplayers') || '?',
+        maxPlayers: stats?.getAttribute('maxplayers') || '?',
+        playingTime: stats?.getAttribute('playingtime') || '?',
+        yearPublished: item.querySelector('yearpublished')?.textContent || '',
+      });
+    });
+    allGames.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+    // Cache 24h
+    localStorage.setItem(GAMES_CACHE_KEY, JSON.stringify({ ts:Date.now(), data:allGames }));
+    renderGamesList();
+  } catch(err) {
+    document.getElementById('games-list').innerHTML = `
+      <div class="loading-msg">
+        <div style="font-size:2rem;margin-bottom:10px">😕</div>
+        <div style="margin-bottom:8px">Impossible de charger la collection BGG.</div>
+        <div style="font-size:.8rem;margin-bottom:14px">Vérifie ta connexion internet.</div>
+        <button class="btn btn-secondary btn-sm" onclick="reloadGames()">Réessayer</button>
+      </div>`;
+  }
+}
+
+function renderGamesList(filter='') {
+  const list = document.getElementById('games-list');
+  const q = filter.toLowerCase();
+  const games = allGames.filter(g => g.name.toLowerCase().includes(q));
+  if (!games.length) {
+    list.innerHTML = '<div class="loading-msg">Aucun jeu trouvé.</div>';
+    return;
+  }
+  fiches = loadFiches();
+  list.innerHTML = games.map(g => {
+    const f = fiches[g.id];
+    const hasFiche = f && (f.steps?.length || f.actions?.length || f.notes);
+    return `
+    <div class="game-row" id="grow-${g.id}" onclick="toggleGameRow('${g.id}')">
+      <div class="game-row-header">
+        ${g.thumbnail
+          ? `<img class="game-thumb" src="${g.thumbnail}" alt="" loading="lazy" onerror="this.style.display='none'">`
+          : `<div class="game-thumb-ph">🎲</div>`}
+        <div class="game-info">
+          <div class="game-name">${g.name}</div>
+          <div class="game-meta">${g.minPlayers}–${g.maxPlayers} joueurs · ${g.playingTime} min${hasFiche?' · <span style="color:var(--success)">✓ fiche</span>':''}</div>
+        </div>
+        <span class="game-chevron">▶</span>
+      </div>
+      <div class="game-fiche" id="fiche-${g.id}">
+        ${renderFicheContent(g.id, g.name)}
+      </div>
+    </div>`;
+  }).join('') + `<div class="bgg-badge">Collection chargée depuis <a href="https://boardgamegeek.com/user/${BGG_USER}" target="_blank">BGG</a></div>`;
+}
+
+function renderFicheContent(id, name) {
+  const f = fiches[id];
+  if (!f || (!f.steps?.length && !f.actions?.length && !f.notes)) {
+    return `<div style="padding:8px 0;color:var(--muted);font-size:.88rem">Pas encore de fiche pour ce jeu.</div>
+      <button class="fiche-edit-btn" onclick="openFicheEditor('${id}','${name.replace(/'/g,"\\'")}');event.stopPropagation()">✏️ Créer la fiche</button>`;
+  }
+  let html = '';
+  if (f.steps?.length) {
+    html += `<div class="fiche-section"><div class="fiche-label">Ordre du tour</div><div class="fiche-steps">`;
+    f.steps.forEach((s,i)=>{ html+=`<div class="fiche-step"><span class="step-num">${i+1}</span><span class="step-txt">${s}</span></div>`; });
+    html += '</div></div>';
+  }
+  if (f.actions?.length) {
+    html += `<div class="fiche-section"><div class="fiche-label">Actions possibles</div><div class="fiche-actions">`;
+    f.actions.forEach(a=>{ html+=`<span class="action-chip">${a}</span>`; });
+    html += '</div></div>';
+  }
+  if (f.notes) {
+    html += `<div class="fiche-section"><div class="fiche-label">Notes</div><div class="fiche-notes">${f.notes}</div></div>`;
+  }
+  html += `<button class="fiche-edit-btn" onclick="openFicheEditor('${id}','${name.replace(/'/g,"\\'")}');event.stopPropagation()">✏️ Modifier la fiche</button>`;
+  return html;
+}
+
+function toggleGameRow(id) {
+  const row = document.getElementById('grow-'+id);
+  row.classList.toggle('open');
+}
+
+function filterGames() {
+  renderGamesList(document.getElementById('search-input').value);
+}
+
+// ══════════════════════════════════════════════════════
+//  FICHE EDITOR
+// ══════════════════════════════════════════════════════
+function loadFiches() {
+  try { return JSON.parse(localStorage.getItem(FICHE_STORAGE_KEY)) || {}; } catch(e) { return {}; }
+}
+
+function saveFichesToStorage() {
+  localStorage.setItem(FICHE_STORAGE_KEY, JSON.stringify(fiches));
+}
+
+function openFicheEditor(id, name) {
+  editingGameId = id;
+  fiches = loadFiches();
+  const f = fiches[id] || { steps:[], actions:[], notes:'' };
+  tmpSteps = [...(f.steps||[])];
+  tmpActions = [...(f.actions||[])];
+  document.getElementById('fiche-modal-title').innerHTML = `Fiche : ${name} <button class="sheet-close" onclick="closeModal('fiche-modal')">✕</button>`;
+  document.getElementById('fiche-notes').value = f.notes||'';
+  renderStepsEditor();
+  renderActionsEditor();
+  openModal('fiche-modal');
+}
+
+function renderStepsEditor() {
+  document.getElementById('steps-editor').innerHTML = tmpSteps.map((s,i)=>`
+    <div class="step-edit-row">
+      <input type="text" value="${s.replace(/"/g,'&quot;')}" onchange="tmpSteps[${i}]=this.value" placeholder="Ex: Jouer une carte…">
+      <button class="step-del-btn" onclick="tmpSteps.splice(${i},1);renderStepsEditor()">✕</button>
+    </div>`).join('');
+}
+
+function addStepField() { tmpSteps.push(''); renderStepsEditor(); }
+
+function renderActionsEditor() {
+  document.getElementById('actions-editor').innerHTML = tmpActions.map((a,i)=>`
+    <div class="action-edit-chip">${a}
+      <button onclick="tmpActions.splice(${i},1);renderActionsEditor()">✕</button>
+    </div>`).join('');
+}
+
+function addActionChip() {
+  const v = document.getElementById('action-input').value.trim();
+  if (!v) return;
+  tmpActions.push(v);
+  document.getElementById('action-input').value='';
+  renderActionsEditor();
+}
+
+function saveFiche() {
+  // Collect inputs from DOM (may have been edited inline)
+  tmpSteps = Array.from(document.querySelectorAll('#steps-editor input')).map(i=>i.value.trim()).filter(Boolean);
+  fiches[editingGameId] = {
+    steps: tmpSteps,
+    actions: tmpActions,
+    notes: document.getElementById('fiche-notes').value.trim()
+  };
+  saveFichesToStorage();
+  closeModal('fiche-modal');
+  // Re-render the games list to show updated fiche
+  renderGamesList(document.getElementById('search-input').value);
+  // Re-open the row
+  setTimeout(()=>{
+    const row=document.getElementById('grow-'+editingGameId);
+    if(row) row.classList.add('open');
+  },100);
+}
+
+// ══════════════════════════════════════════════════════
+//  MODAL HELPERS
+// ══════════════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function renderEmojiGrid() {
+  document.getElementById('emoji-grid').innerHTML = EMOJIS.map(e=>
+    `<div class="emoji-opt ${e===tmpEmoji?'selected':''}" onclick="selectEmoji('${e}')">${e}</div>`).join('');
+}
+function selectEmoji(e) { tmpEmoji=e; document.querySelectorAll('.emoji-opt').forEach(el=>el.classList.toggle('selected',el.textContent===e)); }
+function renderColorGrid() {
+  document.getElementById('color-grid').innerHTML = COLORS.map(c=>
+    `<div class="color-opt ${c===tmpColor?'selected':''}" style="background:${c}" onclick="selectColor('${c}')"></div>`).join('');
+}
+function selectColor(c) { tmpColor=c; document.querySelectorAll('.color-opt').forEach(el=>el.classList.toggle('selected',el.style.backgroundColor===c||el.style.background===c)); }
+
+// ══════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════
+function vibrate(p) { if('vibrate' in navigator) navigator.vibrate(p); }
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+// ══════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════
+initSetup();
+loadGames();
+</script>
+</body>
+</html>
