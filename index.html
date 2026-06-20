@@ -345,6 +345,7 @@
     <h1>🎲 <span>Timer</span></h1>
     <div style="display:flex;gap:8px">
       <button class="icon-btn" id="sound-btn" onclick="toggleSound()" title="Son">🔊</button>
+      <button class="icon-btn" onclick="testSounds()" title="Tester les bips">🔔</button>
       <button class="icon-btn" onclick="resetConfirm()" title="Reconfigurer">↩</button>
     </div>
   </div>
@@ -644,14 +645,25 @@ function startTick() {
   clearInterval(interval);
   const p=players[activeIdx];
   if (p.totalSec===0) return;
-  let warningPlayed = (remaining(p) > 10); // évite de rejouer le warning si on reprend après 10s
+  // Évite de rejouer les bips si on reprend une pause après ces seuils
+  let warning15Played = (remaining(p) > 15);
+  let countdownPlayed = new Set();
+  // Marque comme "déjà joués" tous les seuils de décompte (1-5) qu'on a déjà dépassés
+  for (let s=1; s<=5; s++) { if (remaining(p) < s) countdownPlayed.add(s); }
+
   interval = setInterval(()=>{
     p.elapsed++;
     updateTimerDisplay();
     const rem = remaining(p);
-    if (soundEnabled && rem === 10 && !warningPlayed) {
-      playWarningBeep();
-      warningPlayed = true;
+    if (soundEnabled) {
+      if (rem === 15 && !warning15Played) {
+        playWarningBeep();
+        warning15Played = true;
+      }
+      if (rem >= 1 && rem <= 5 && !countdownPlayed.has(rem)) {
+        playCountdownBeep();
+        countdownPlayed.add(rem);
+      }
     }
     if (rem<=0) {
       clearInterval(interval);
@@ -747,12 +759,19 @@ async function reloadGames() {
   await fetchBGGCollection();
 }
 
-// BGG bloque les requêtes CORS directes depuis un navigateur (confirmé par BGG eux-mêmes).
-// On passe donc par des proxys CORS publics, avec repli automatique si l'un échoue.
+// ──────────────────────────────────────────────────────
+// Stratégie de chargement BGG, en cascade :
+//   1) Wrapper JSON non-officiel (bgg-json.azurewebsites.net) qui supporte
+//      CORS nativement → pas besoin de proxy, le plus simple et le plus rapide.
+//   2) Si indisponible (le service est peu fiable, hébergé en gratuit) :
+//      on retombe sur l'API XML officielle de BGG via des proxys CORS publics,
+//      en testant plusieurs proxys car ils sont eux-mêmes instables.
+// ──────────────────────────────────────────────────────
+
 const CORS_PROXIES = [
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
 ];
 
 async function fetchWithProxies(targetUrl, { retryOn202 = false } = {}) {
@@ -781,42 +800,84 @@ async function fetchWithProxies(targetUrl, { retryOn202 = false } = {}) {
   throw lastErr || new Error('Tous les proxys ont échoué');
 }
 
-async function fetchBGGCollection() {
+// Tentative 1 : wrapper JSON natif (CORS déjà géré côté serveur, pas de proxy requis)
+async function tryFetchViaJsonWrapper() {
+  const url = `https://bgg-json.azurewebsites.net/collection/${BGG_USER}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (!Array.isArray(data) || !data.length) throw new Error('Collection vide ou format inattendu');
+  return data.map(g => ({
+    id: String(g.gameId ?? g.id ?? g.objectId ?? ''),
+    name: g.name || '?',
+    thumbnail: g.thumbnail || g.image || '',
+    minPlayers: g.minPlayers ?? '?',
+    maxPlayers: g.maxPlayers ?? '?',
+    playingTime: g.playingTime ?? g.maxPlayTime ?? '?',
+    yearPublished: g.yearPublished || '',
+  })).filter(g => g.id);
+}
+
+// Tentative 2 : API XML officielle via proxy CORS
+async function tryFetchViaXmlProxy() {
   const url = `https://boardgamegeek.com/xmlapi2/collection?username=${BGG_USER}&own=1&subtype=boardgame&stats=1&excludesubtype=boardgameexpansion`;
-  try {
-    const txt = await fetchWithProxies(url, { retryOn202: true });
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(txt, 'text/xml');
-    const items = xml.querySelectorAll('item');
-    if (!items.length) throw new Error('Aucun jeu trouvé dans la réponse');
-    allGames = [];
-    items.forEach(item => {
-      const name = item.querySelector('name')?.textContent || '?';
-      const thumb = item.querySelector('thumbnail')?.textContent || '';
-      const stats = item.querySelector('stats');
-      allGames.push({
-        id: item.getAttribute('objectid'),
-        name,
-        thumbnail: thumb.startsWith('//') ? 'https:'+thumb : thumb,
-        minPlayers: stats?.getAttribute('minplayers') || '?',
-        maxPlayers: stats?.getAttribute('maxplayers') || '?',
-        playingTime: stats?.getAttribute('playingtime') || '?',
-        yearPublished: item.querySelector('yearpublished')?.textContent || '',
-      });
+  const txt = await fetchWithProxies(url, { retryOn202: true });
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(txt, 'text/xml');
+  const items = xml.querySelectorAll('item');
+  if (!items.length) throw new Error('Aucun jeu trouvé dans la réponse XML');
+  const games = [];
+  items.forEach(item => {
+    const name = item.querySelector('name')?.textContent || '?';
+    const thumb = item.querySelector('thumbnail')?.textContent || '';
+    const stats = item.querySelector('stats');
+    games.push({
+      id: item.getAttribute('objectid'),
+      name,
+      thumbnail: thumb.startsWith('//') ? 'https:'+thumb : thumb,
+      minPlayers: stats?.getAttribute('minplayers') || '?',
+      maxPlayers: stats?.getAttribute('maxplayers') || '?',
+      playingTime: stats?.getAttribute('playingtime') || '?',
+      yearPublished: item.querySelector('yearpublished')?.textContent || '',
     });
-    allGames.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
-    localStorage.setItem(GAMES_CACHE_KEY, JSON.stringify({ ts:Date.now(), data:allGames }));
-    renderGamesList();
-  } catch(err) {
-    console.error('Erreur chargement BGG:', err);
+  });
+  return games;
+}
+
+async function fetchBGGCollection() {
+  let games = null;
+  let lastErr = null;
+
+  try {
+    games = await tryFetchViaJsonWrapper();
+  } catch (e) {
+    console.warn('Wrapper JSON BGG indisponible, tentative via proxy XML…', e);
+    lastErr = e;
+  }
+
+  if (!games) {
+    try {
+      games = await tryFetchViaXmlProxy();
+    } catch (e) {
+      console.error('Proxy XML aussi en échec:', e);
+      lastErr = e;
+    }
+  }
+
+  if (!games) {
     document.getElementById('games-list').innerHTML = `
       <div class="loading-msg">
         <div style="font-size:2rem;margin-bottom:10px">😕</div>
-        <div style="margin-bottom:8px">Impossible de charger la collection BGG.</div>
-        <div style="font-size:.8rem;margin-bottom:14px">Vérifie ta connexion internet, ou réessaie dans une minute (BGG peut être lent).</div>
+        <div style="margin-bottom:8px">Impossible de charger la collection BGG pour le moment.</div>
+        <div style="font-size:.8rem;margin-bottom:14px">Les services utilisés pour contourner les restrictions de BGG sont parfois temporairement indisponibles. Réessaie dans une minute.</div>
         <button class="btn btn-secondary btn-sm" onclick="reloadGames()">Réessayer</button>
       </div>`;
+    return;
   }
+
+  allGames = games.sort((a,b) => a.name.localeCompare(b.name, 'fr'));
+  localStorage.setItem(GAMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: allGames }));
+  renderGamesList();
 }
 
 function renderGamesList(filter='') {
@@ -996,9 +1057,14 @@ function playBeep(freq=880, duration=0.15, volume=0.3, delay=0) {
   } catch(e) { /* audio non dispo, on ignore */ }
 }
 
-// Petit bip d'avertissement (ex: 10s restantes)
+// Bip d'avertissement à 15 secondes restantes
 function playWarningBeep() {
-  playBeep(740, 0.12, 0.22);
+  playBeep(740, 0.13, 0.25);
+}
+
+// Petit bip sec pour chacune des 5 dernières secondes (5,4,3,2,1)
+function playCountdownBeep() {
+  playBeep(880, 0.09, 0.28);
 }
 
 // Sonnerie de fin de temps : 3 bips montants
@@ -1025,6 +1091,19 @@ function toggleSound() {
 function updateSoundBtn() {
   const btn = document.getElementById('sound-btn');
   if (btn) btn.textContent = soundEnabled ? '🔊' : '🔇';
+}
+
+// Joue la séquence complète (warning 15s + décompte 5..1 + alarme finale) à la suite,
+// pour vérifier que tout s'entend bien sans attendre un vrai timer.
+function testSounds() {
+  getAudioCtx();
+  let t = 0;
+  playBeep(740, 0.13, 0.25, t); t += 0.5; // warning 15s
+  for (let i=0; i<5; i++) { playBeep(880, 0.09, 0.28, t); t += 0.35; } // décompte
+  playBeep(523, 0.16, 0.32, t); t += 0.18;
+  playBeep(659, 0.16, 0.32, t); t += 0.18;
+  playBeep(784, 0.30, 0.35, t); // alarme finale
+  vibrate([60]);
 }
 
 
