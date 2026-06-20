@@ -1939,6 +1939,7 @@ function startTick() {
   if (p.totalSec===0) return;
   // Évite de rejouer les bips si on reprend une pause après ces seuils
   let warning15Played = (remaining(p) > 15);
+  let warning10Played = (remaining(p) > 10);
   let countdownPlayed = new Set();
   // Marque comme "déjà joués" tous les seuils de décompte (1-5) qu'on a déjà dépassés
   for (let s=1; s<=5; s++) { if (remaining(p) < s) countdownPlayed.add(s); }
@@ -1952,6 +1953,10 @@ function startTick() {
         playWarningBeep();
         warning15Played = true;
       }
+      if (rem === 10 && !warning10Played) {
+        playTenSecBeep();
+        warning10Played = true;
+      }
       if (rem >= 1 && rem <= 5 && !countdownPlayed.has(rem)) {
         playCountdownBeep();
         countdownPlayed.add(rem);
@@ -1959,7 +1964,7 @@ function startTick() {
     }
     if (rem<=0) {
       clearInterval(interval);
-      vibrate([100,50,100,50,200]);
+      vibrate([100,50,100,50,200,100,300]);
       if (soundEnabled) playTimeUpAlarm();
     }
   }, 1000);
@@ -2290,16 +2295,25 @@ function playWarningBeep() {
   playBeep(740, 0.13, 0.25);
 }
 
+// Bip à 10 secondes restantes, timbre distinct (plus grave que le décompte, plus haut que le 15s)
+function playTenSecBeep() {
+  playBeep(660, 0.13, 0.27);
+  playBeep(660, 0.13, 0.27, 0.18); // double bip pour bien le distinguer du simple bip de 15s
+}
+
 // Petit bip sec pour chacune des 5 dernières secondes (5,4,3,2,1)
 function playCountdownBeep() {
   playBeep(880, 0.09, 0.28);
 }
 
-// Sonnerie de fin de temps : 3 bips montants
+// Sonnerie de fin de temps : longue et marquante, bien distincte de tous les autres bips
 function playTimeUpAlarm() {
-  playBeep(523, 0.16, 0.32, 0);
-  playBeep(659, 0.16, 0.32, 0.18);
-  playBeep(784, 0.30, 0.35, 0.36);
+  // Deux paires de notes graves-aiguës qui se chevauchent légèrement, suivies d'une note longue tenue
+  playBeep(440, 0.35, 0.38, 0);
+  playBeep(660, 0.35, 0.38, 0.22);
+  playBeep(440, 0.35, 0.38, 0.55);
+  playBeep(660, 0.35, 0.38, 0.77);
+  playBeep(880, 0.9,  0.4,  1.1); // note finale longue et tenue qui marque le coup
 }
 
 // Petit clic discret pour "joueur suivant"
@@ -2321,16 +2335,20 @@ function updateSoundBtn() {
   if (btn) btn.textContent = soundEnabled ? '🔊' : '🔇';
 }
 
-// Joue la séquence complète (warning 15s + décompte 5..1 + alarme finale) à la suite,
+// Joue la séquence complète (warning 15s + 10s + décompte 5..1 + alarme finale) à la suite,
 // pour vérifier que tout s'entend bien sans attendre un vrai timer.
 function testSounds() {
   getAudioCtx();
   let t = 0;
-  playBeep(740, 0.13, 0.25, t); t += 0.5; // warning 15s
-  for (let i=0; i<5; i++) { playBeep(880, 0.09, 0.28, t); t += 0.35; } // décompte
-  playBeep(523, 0.16, 0.32, t); t += 0.18;
-  playBeep(659, 0.16, 0.32, t); t += 0.18;
-  playBeep(784, 0.30, 0.35, t); // alarme finale
+  playBeep(740, 0.13, 0.25, t); t += 0.6; // warning 15s
+  playBeep(660, 0.13, 0.27, t); playBeep(660, 0.13, 0.27, t+0.18); t += 0.7; // warning 10s (double bip)
+  for (let i=0; i<5; i++) { playBeep(880, 0.09, 0.28, t); t += 0.35; } // décompte 5-4-3-2-1
+  t += 0.2;
+  playBeep(440, 0.35, 0.38, t); t += 0.22;
+  playBeep(660, 0.35, 0.38, t); t += 0.33;
+  playBeep(440, 0.35, 0.38, t); t += 0.22;
+  playBeep(660, 0.35, 0.38, t); t += 0.33;
+  playBeep(880, 0.9, 0.4, t); // alarme finale, longue et tenue
   vibrate([60]);
 }
 
