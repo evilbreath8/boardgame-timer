@@ -282,6 +282,7 @@
   <div class="game-header">
     <h1>🎲 <span>Timer</span></h1>
     <div style="display:flex;gap:8px">
+      <button class="icon-btn" id="sound-btn" onclick="toggleSound()" title="Son">🔊</button>
       <button class="icon-btn" onclick="resetConfirm()" title="Reconfigurer">↩</button>
     </div>
   </div>
@@ -455,6 +456,7 @@ document.getElementById('custom-min').addEventListener('input', e => {
 
 function startGame() {
   if (players.length < 2) { alert('Ajoute au moins 2 joueurs !'); return; }
+  getAudioCtx(); // débloque l'audio dès la première interaction (requis par les navigateurs)
   players.forEach(p => { p.totalSec = selectedTime; p.elapsed = 0; });
   tourNum = 1; activeIdx = -1; paused = false;
   clearInterval(interval);
@@ -511,6 +513,7 @@ function nextPlayer() {
   }
   paused=false; startTick(); renderPlayers(); updateTourBar();
   vibrate([40]);
+  if (soundEnabled) playTickSound();
 }
 
 function togglePause() {
@@ -525,10 +528,20 @@ function startTick() {
   clearInterval(interval);
   const p=players[activeIdx];
   if (p.totalSec===0) return;
+  let warningPlayed = (remaining(p) > 10); // évite de rejouer le warning si on reprend après 10s
   interval = setInterval(()=>{
     p.elapsed++;
     updateTimerDisplay();
-    if (remaining(p)<=0) { clearInterval(interval); vibrate([100,50,100,50,200]); }
+    const rem = remaining(p);
+    if (soundEnabled && rem === 10 && !warningPlayed) {
+      playWarningBeep();
+      warningPlayed = true;
+    }
+    if (rem<=0) {
+      clearInterval(interval);
+      vibrate([100,50,100,50,200]);
+      if (soundEnabled) playTimeUpAlarm();
+    }
   }, 1000);
 }
 
@@ -575,22 +588,48 @@ async function reloadGames() {
   await fetchBGGCollection();
 }
 
+// BGG bloque les requêtes CORS directes depuis un navigateur (confirmé par BGG eux-mêmes).
+// On passe donc par des proxys CORS publics, avec repli automatique si l'un échoue.
+const CORS_PROXIES = [
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+async function fetchWithProxies(targetUrl, { retryOn202 = false } = {}) {
+  let lastErr = null;
+  for (const buildProxyUrl of CORS_PROXIES) {
+    try {
+      const proxyUrl = buildProxyUrl(targetUrl);
+      let res = await fetch(proxyUrl);
+      if (retryOn202) {
+        let tries = 0;
+        while (res.status === 202 && tries < 5) {
+          await new Promise(r => setTimeout(r, 3000));
+          res = await fetch(proxyUrl);
+          tries++;
+        }
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const txt = await res.text();
+      if (!txt || txt.length < 20) throw new Error('Réponse vide');
+      return txt;
+    } catch (e) {
+      lastErr = e;
+      continue; // essaie le proxy suivant
+    }
+  }
+  throw lastErr || new Error('Tous les proxys ont échoué');
+}
+
 async function fetchBGGCollection() {
   const url = `https://boardgamegeek.com/xmlapi2/collection?username=${BGG_USER}&own=1&subtype=boardgame&stats=1&excludesubtype=boardgameexpansion`;
   try {
-    let res = await fetch(url);
-    // BGG renvoie 202 si la requête est en file d'attente → réessayer
-    let tries = 0;
-    while (res.status === 202 && tries < 5) {
-      await new Promise(r=>setTimeout(r, 3000));
-      res = await fetch(url);
-      tries++;
-    }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const txt = await res.text();
+    const txt = await fetchWithProxies(url, { retryOn202: true });
     const parser = new DOMParser();
     const xml = parser.parseFromString(txt, 'text/xml');
     const items = xml.querySelectorAll('item');
+    if (!items.length) throw new Error('Aucun jeu trouvé dans la réponse');
     allGames = [];
     items.forEach(item => {
       const name = item.querySelector('name')?.textContent || '?';
@@ -607,15 +646,15 @@ async function fetchBGGCollection() {
       });
     });
     allGames.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
-    // Cache 24h
     localStorage.setItem(GAMES_CACHE_KEY, JSON.stringify({ ts:Date.now(), data:allGames }));
     renderGamesList();
   } catch(err) {
+    console.error('Erreur chargement BGG:', err);
     document.getElementById('games-list').innerHTML = `
       <div class="loading-msg">
         <div style="font-size:2rem;margin-bottom:10px">😕</div>
         <div style="margin-bottom:8px">Impossible de charger la collection BGG.</div>
-        <div style="font-size:.8rem;margin-bottom:14px">Vérifie ta connexion internet.</div>
+        <div style="font-size:.8rem;margin-bottom:14px">Vérifie ta connexion internet, ou réessaie dans une minute (BGG peut être lent).</div>
         <button class="btn btn-secondary btn-sm" onclick="reloadGames()">Réessayer</button>
       </div>`;
   }
@@ -771,9 +810,65 @@ function renderColorGrid() {
 function selectColor(c) { tmpColor=c; document.querySelectorAll('.color-opt').forEach(el=>el.classList.toggle('selected',el.style.backgroundColor===c||el.style.background===c)); }
 
 // ══════════════════════════════════════════════════════
-//  UTILS
+//  AUDIO (bips générés, pas de fichiers à charger)
 // ══════════════════════════════════════════════════════
-function vibrate(p) { if('vibrate' in navigator) navigator.vibrate(p); }
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playBeep(freq=880, duration=0.15, volume=0.3, delay=0) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const startAt = ctx.currentTime + delay;
+    gain.gain.setValueAtTime(0, startAt);
+    gain.gain.linearRampToValueAtTime(volume, startAt + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startAt);
+    osc.stop(startAt + duration + 0.02);
+  } catch(e) { /* audio non dispo, on ignore */ }
+}
+
+// Petit bip d'avertissement (ex: 10s restantes)
+function playWarningBeep() {
+  playBeep(740, 0.12, 0.22);
+}
+
+// Sonnerie de fin de temps : 3 bips montants
+function playTimeUpAlarm() {
+  playBeep(523, 0.16, 0.32, 0);
+  playBeep(659, 0.16, 0.32, 0.18);
+  playBeep(784, 0.30, 0.35, 0.36);
+}
+
+// Petit clic discret pour "joueur suivant"
+function playTickSound() {
+  playBeep(440, 0.08, 0.15);
+}
+
+let soundEnabled = true;
+try { soundEnabled = localStorage.getItem('sound_enabled') !== 'false'; } catch(e) {}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem('sound_enabled', soundEnabled);
+  updateSoundBtn();
+  if (soundEnabled) playTickSound();
+}
+function updateSoundBtn() {
+  const btn = document.getElementById('sound-btn');
+  if (btn) btn.textContent = soundEnabled ? '🔊' : '🔇';
+}
+
+
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
@@ -782,6 +877,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 // ══════════════════════════════════════════════════════
 initSetup();
 loadGames();
+updateSoundBtn();
 </script>
 </body>
 </html>
