@@ -2106,6 +2106,31 @@ function renderGameDetails(g) {
   return `<div style="font-size:.78rem;color:var(--muted);padding:10px 0 2px;border-bottom:1px solid var(--border);margin-bottom:4px">${bits.join(' · ')}</div>`;
 }
 
+// Contenu de la fiche de règles (étapes, actions, notes) ou invitation à la créer
+function renderFicheContent(id, name) {
+  const f = fiches[id];
+  if (!f || (!f.steps?.length && !f.actions?.length && !f.notes)) {
+    return `<div style="padding:8px 0;color:var(--muted);font-size:.88rem">Pas encore de fiche pour ce jeu.</div>
+      <button class="fiche-edit-btn" onclick="openFicheEditor('${id}','${name.replace(/'/g,"\\'")}');event.stopPropagation()">✏️ Créer la fiche</button>`;
+  }
+  let html = '';
+  if (f.steps?.length) {
+    html += `<div class="fiche-section"><div class="fiche-label">Ordre du tour</div><div class="fiche-steps">`;
+    f.steps.forEach((s,i)=>{ html+=`<div class="fiche-step"><span class="step-num">${i+1}</span><span class="step-txt">${s}</span></div>`; });
+    html += '</div></div>';
+  }
+  if (f.actions?.length) {
+    html += `<div class="fiche-section"><div class="fiche-label">Actions possibles</div><div class="fiche-actions">`;
+    f.actions.forEach(a=>{ html+=`<span class="action-chip">${a}</span>`; });
+    html += '</div></div>';
+  }
+  if (f.notes) {
+    html += `<div class="fiche-section"><div class="fiche-label">Notes</div><div class="fiche-notes">${f.notes}</div></div>`;
+  }
+  html += `<button class="fiche-edit-btn" onclick="openFicheEditor('${id}','${name.replace(/'/g,"\\'")}');event.stopPropagation()">✏️ Modifier la fiche</button>`;
+  return html;
+}
+
 function toggleGameRow(id) {
   const row = document.getElementById('grow-'+id);
   row.classList.toggle('open');
