@@ -169,7 +169,6 @@
       -webkit-tap-highlight-color:transparent;
     }
     .game-row-header { display:flex; align-items:center; gap:12px; padding:11px 14px; }
-    .game-thumb { width:44px; height:44px; border-radius:9px; object-fit:cover; flex-shrink:0; background:var(--surface2); }
     .game-thumb-ph { width:44px; height:44px; border-radius:9px; background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
     .game-info { flex:1; min-width:0; }
     .game-name { font-weight:700; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -197,10 +196,6 @@
     }
     .fiche-edit-btn:active { border-color:var(--accent); color:var(--accent); }
     .loading-msg { text-align:center; padding:40px 20px; color:var(--muted); }
-    .loading-spinner { font-size:2rem; animation:spin 1s linear infinite; display:block; margin-bottom:12px; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    .bgg-badge { font-size:.7rem; color:var(--muted); text-align:center; padding:6px; }
-    .bgg-badge a { color:var(--accent); text-decoration:none; }
 
     /* ── MODAL ── */
     .overlay {
@@ -382,15 +377,10 @@
 <div class="page" id="page-fiches">
   <div class="fiches-header">
     <h2>📋 Fiches de jeu</h2>
-    <button class="icon-btn" onclick="reloadGames()" title="Recharger depuis BGG">↻</button>
+    <button class="icon-btn" onclick="openAddGame()" title="Ajouter un jeu">+</button>
   </div>
   <input class="search-bar" type="text" id="search-input" placeholder="🔍  Rechercher un jeu…" oninput="filterGames()">
-  <div class="games-list" id="games-list">
-    <div class="loading-msg">
-      <span class="loading-spinner">⚙️</span>
-      Chargement de ta collection BGG…
-    </div>
-  </div>
+  <div class="games-list" id="games-list"></div>
 </div>
 
 <!-- ═══ MODAL: Joueur ═══ -->
@@ -430,15 +420,1317 @@
   </div>
 </div>
 
+<!-- ═══ MODAL: Ajouter un jeu ═══ -->
+<div class="overlay" id="game-modal">
+  <div class="sheet">
+    <div class="sheet-title">Nouveau jeu <button class="sheet-close" onclick="closeModal('game-modal')">✕</button></div>
+    <div class="form-row"><label>Nom du jeu</label><input type="text" id="game-input-name" placeholder="Ex: Gloomhaven" maxlength="60"></div>
+    <div class="form-row"><label>Durée (minutes, optionnel)</label><input type="number" id="game-input-duration" placeholder="Ex: 60" min="1" max="600"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeModal('game-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveCustomGame()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════════
 //  CONSTANTS
 // ══════════════════════════════════════════════════════
+// Collection de jeux importée depuis l'export CSV BoardGameGeek de Ludovic.
+// Liste statique embarquée : aucune requête réseau, donc aucune dépendance
+// à la fiabilité de l'API BGG ou de proxys CORS.
+const STATIC_GAMES = [
+  {
+    "id": "432",
+    "name": "6 qui prend!",
+    "rating": 7.0,
+    "weight": 1.2,
+    "rank": 677,
+    "minPlaytime": 45,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Gigamic",
+    "year": "2017"
+  },
+  {
+    "id": "316377",
+    "name": "7 Wonders (Second Edition)",
+    "rating": 7.8,
+    "weight": 2.3,
+    "rank": 200,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Repos Production",
+    "year": "2020"
+  },
+  {
+    "id": "316378",
+    "name": "7 Wonders (Second Edition): Cities",
+    "rating": 8.0,
+    "weight": 2.3,
+    "rank": null,
+    "minPlaytime": 40,
+    "maxPlaytime": 40,
+    "isExpansion": true,
+    "publisher": "Repos Production",
+    "year": "2020"
+  },
+  {
+    "id": "316380",
+    "name": "7 Wonders (Second Edition): Leaders",
+    "rating": 8.2,
+    "weight": 2.4,
+    "rank": null,
+    "minPlaytime": 40,
+    "maxPlaytime": 40,
+    "isExpansion": true,
+    "publisher": "Repos Production",
+    "year": "2021"
+  },
+  {
+    "id": "378839",
+    "name": "7 Wonders: Edifice",
+    "rating": 7.4,
+    "weight": 1.7,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": true,
+    "publisher": "Repos Production",
+    "year": "2023"
+  },
+  {
+    "id": "357563",
+    "name": "Akropolis",
+    "rating": 7.4,
+    "weight": 1.8,
+    "rank": 453,
+    "minPlaytime": 20,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Gigamic",
+    "year": "2022"
+  },
+  {
+    "id": "422822",
+    "name": "Akropolis: Athena",
+    "rating": 7.7,
+    "weight": 2.3,
+    "rank": null,
+    "minPlaytime": 25,
+    "maxPlaytime": 25,
+    "isExpansion": true,
+    "publisher": "Gigamic",
+    "year": "2024"
+  },
+  {
+    "id": "461828",
+    "name": "Akropolis: Pantheon",
+    "rating": 8.3,
+    "weight": 2.0,
+    "rank": null,
+    "minPlaytime": 25,
+    "maxPlaytime": 25,
+    "isExpansion": true,
+    "publisher": "Gigamic",
+    "year": "2026"
+  },
+  {
+    "id": "351594",
+    "name": "Amalfi: Renaissance",
+    "rating": 7.7,
+    "weight": 3.3,
+    "rank": 1924,
+    "minPlaytime": 60,
+    "maxPlaytime": 120,
+    "isExpansion": false,
+    "publisher": "Sylex",
+    "year": "2023"
+  },
+  {
+    "id": "127398",
+    "name": "Andor",
+    "rating": 7.1,
+    "weight": 2.8,
+    "rank": 682,
+    "minPlaytime": 60,
+    "maxPlaytime": 90,
+    "isExpansion": false,
+    "publisher": "IELLO",
+    "year": "2012"
+  },
+  {
+    "id": "419411",
+    "name": "Arnaque, bluff et diamant",
+    "rating": 6.0,
+    "weight": 1.0,
+    "rank": null,
+    "minPlaytime": 20,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "F1rst Editions",
+    "year": "2023"
+  },
+  {
+    "id": "230802",
+    "name": "Azul",
+    "rating": 7.7,
+    "weight": 1.8,
+    "rank": 99,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Next Move Games",
+    "year": "2018"
+  },
+  {
+    "id": "413246",
+    "name": "Bomb Busters",
+    "rating": 8.0,
+    "weight": 2.0,
+    "rank": 91,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Cocktail Games",
+    "year": "2024"
+  },
+  {
+    "id": "393325",
+    "name": "Captain Flip",
+    "rating": 7.2,
+    "weight": 1.2,
+    "rank": 889,
+    "minPlaytime": 20,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "PlayPunk",
+    "year": "2024"
+  },
+  {
+    "id": "413556",
+    "name": "Captain Flip: In the Jaws of the Kraken",
+    "rating": 7.3,
+    "weight": 1.1,
+    "rank": null,
+    "minPlaytime": 20,
+    "maxPlaytime": 20,
+    "isExpansion": true,
+    "publisher": "PlayPunk",
+    "year": "2024"
+  },
+  {
+    "id": "458424",
+    "name": "Captain Flip: Isla Bomba",
+    "rating": 8.1,
+    "weight": 1.0,
+    "rank": null,
+    "minPlaytime": 25,
+    "maxPlaytime": 30,
+    "isExpansion": true,
+    "publisher": "PlayPunk",
+    "year": "2026"
+  },
+  {
+    "id": "822",
+    "name": "Carcassonne",
+    "rating": 7.4,
+    "weight": 1.9,
+    "rank": 239,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Z-Man Games",
+    "year": "2021"
+  },
+  {
+    "id": "2993",
+    "name": "Carcassonne: Auberges et Cathédrales",
+    "rating": 7.6,
+    "weight": 1.9,
+    "rank": null,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": true,
+    "publisher": "Filosofia Éditions",
+    "year": "2015"
+  },
+  {
+    "id": "217006",
+    "name": "Carcassonne: Extension 10 – Tous en piste !",
+    "rating": 7.4,
+    "weight": 1.9,
+    "rank": null,
+    "minPlaytime": 45,
+    "maxPlaytime": 45,
+    "isExpansion": true,
+    "publisher": "Edge Entertainment",
+    "year": "2017"
+  },
+  {
+    "id": "5405",
+    "name": "Carcassonne: Marchands & Bâtisseurs",
+    "rating": 7.6,
+    "weight": 2.1,
+    "rank": null,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": true,
+    "publisher": "Filosofia Éditions",
+    "year": "2015"
+  },
+  {
+    "id": "295947",
+    "name": "Cascadia",
+    "rating": 7.9,
+    "weight": 1.8,
+    "rank": 60,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Alderac Entertainment Group",
+    "year": "2021"
+  },
+  {
+    "id": "385318",
+    "name": "Cascadia: Paysages",
+    "rating": 7.7,
+    "weight": 2.2,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": true,
+    "publisher": "Alderac Entertainment Group",
+    "year": "2023"
+  },
+  {
+    "id": "13",
+    "name": "Catan",
+    "rating": 7.1,
+    "weight": 2.3,
+    "rank": 621,
+    "minPlaytime": 60,
+    "maxPlaytime": 120,
+    "isExpansion": false,
+    "publisher": "KOSMOS",
+    "year": "2017"
+  },
+  {
+    "id": "416851",
+    "name": "Château Combo",
+    "rating": 7.7,
+    "weight": 1.7,
+    "rank": 220,
+    "minPlaytime": 10,
+    "maxPlaytime": 25,
+    "isExpansion": false,
+    "publisher": "Catch Up Games",
+    "year": "2024"
+  },
+  {
+    "id": "448182",
+    "name": "Château Combo: Au cachot!",
+    "rating": 8.0,
+    "weight": 1.8,
+    "rank": null,
+    "minPlaytime": 10,
+    "maxPlaytime": 25,
+    "isExpansion": true,
+    "publisher": "Catch Up Games",
+    "year": "2025"
+  },
+  {
+    "id": "416788",
+    "name": "Cités Royales",
+    "rating": 7.7,
+    "weight": 2.0,
+    "rank": 14989,
+    "minPlaytime": 30,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Origames",
+    "year": "2024"
+  },
+  {
+    "id": "365717",
+    "name": "Clank!: Catacombes",
+    "rating": 8.2,
+    "weight": 2.5,
+    "rank": 49,
+    "minPlaytime": 45,
+    "maxPlaytime": 90,
+    "isExpansion": false,
+    "publisher": "Dire Wolf",
+    "year": "2024"
+  },
+  {
+    "id": "447586",
+    "name": "Clank!: Catacombes – Les Enfers",
+    "rating": 8.3,
+    "weight": 2.9,
+    "rank": null,
+    "minPlaytime": 45,
+    "maxPlaytime": 90,
+    "isExpansion": true,
+    "publisher": "Dire Wolf",
+    "year": "2026"
+  },
+  {
+    "id": "422869",
+    "name": "Clank!: Catacombes: Antres et Cavernes Oubliées",
+    "rating": 8.3,
+    "weight": 2.5,
+    "rank": null,
+    "minPlaytime": 45,
+    "maxPlaytime": 90,
+    "isExpansion": true,
+    "publisher": "Origames",
+    "year": "2025"
+  },
+  {
+    "id": "316546",
+    "name": "Clever Cubed",
+    "rating": 7.5,
+    "weight": 2.4,
+    "rank": 886,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "",
+    "year": ""
+  },
+  {
+    "id": "178900",
+    "name": "Codenames",
+    "rating": 7.5,
+    "weight": 1.3,
+    "rank": 161,
+    "minPlaytime": 15,
+    "maxPlaytime": 15,
+    "isExpansion": false,
+    "publisher": "Czech Games Edition (CGE)",
+    "year": "2025"
+  },
+  {
+    "id": "224037",
+    "name": "Codenames: Duo",
+    "rating": 7.4,
+    "weight": 1.4,
+    "rank": 275,
+    "minPlaytime": 15,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "IELLO",
+    "year": "2017"
+  },
+  {
+    "id": "198773",
+    "name": "Codenames: Images",
+    "rating": 7.2,
+    "weight": 1.2,
+    "rank": 507,
+    "minPlaytime": 15,
+    "maxPlaytime": 15,
+    "isExpansion": false,
+    "publisher": "IELLO",
+    "year": "2017"
+  },
+  {
+    "id": "402283",
+    "name": "Courtisans",
+    "rating": 7.3,
+    "weight": 1.3,
+    "rank": 1058,
+    "minPlaytime": 20,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Catch Up Games",
+    "year": "2024"
+  },
+  {
+    "id": "298069",
+    "name": "Cubitos",
+    "rating": 7.4,
+    "weight": 2.2,
+    "rank": 511,
+    "minPlaytime": 30,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Ludistri",
+    "year": "2022"
+  },
+  {
+    "id": "380135",
+    "name": "Dead Cells, le jeu de société rogue-lite",
+    "rating": 7.6,
+    "weight": 2.3,
+    "rank": 1600,
+    "minPlaytime": 45,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Scorpion Masqué",
+    "year": "2024"
+  },
+  {
+    "id": "39856",
+    "name": "Dixit",
+    "rating": 7.2,
+    "weight": 1.2,
+    "rank": 429,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Libellud",
+    "year": "2021"
+  },
+  {
+    "id": "234553",
+    "name": "Dixit: Harmonies",
+    "rating": 7.8,
+    "weight": 1.2,
+    "rank": null,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": true,
+    "publisher": "Libellud",
+    "year": "2021"
+  },
+  {
+    "id": "174090",
+    "name": "Dixit: Memories",
+    "rating": 7.9,
+    "weight": 1.2,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": true,
+    "publisher": "Libellud",
+    "year": "2015"
+  },
+  {
+    "id": "205761",
+    "name": "Dixit: Revelations",
+    "rating": 7.9,
+    "weight": 1.2,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": true,
+    "publisher": "Filosofia Éditions",
+    "year": "2016"
+  },
+  {
+    "id": "199792",
+    "name": "Everdell",
+    "rating": 8.0,
+    "weight": 2.8,
+    "rank": 44,
+    "minPlaytime": 40,
+    "maxPlaytime": 80,
+    "isExpansion": false,
+    "publisher": "Matagot",
+    "year": "2021"
+  },
+  {
+    "id": "289057",
+    "name": "Everdell: Bellfaire",
+    "rating": 8.0,
+    "weight": 2.8,
+    "rank": null,
+    "minPlaytime": 40,
+    "maxPlaytime": 120,
+    "isExpansion": true,
+    "publisher": "Matagot",
+    "year": "2022"
+  },
+  {
+    "id": "259996",
+    "name": "Everdell: Pearlbrook",
+    "rating": 7.6,
+    "weight": 2.8,
+    "rank": null,
+    "minPlaytime": 40,
+    "maxPlaytime": 80,
+    "isExpansion": true,
+    "publisher": "Starling Games (II)",
+    "year": "2021"
+  },
+  {
+    "id": "256804",
+    "name": "Exploding Kittens: Édition Festive",
+    "rating": 7.0,
+    "weight": 1.1,
+    "rank": 2182,
+    "minPlaytime": 15,
+    "maxPlaytime": 15,
+    "isExpansion": false,
+    "publisher": "Exploding Kittens",
+    "year": "2021"
+  },
+  {
+    "id": "385761",
+    "name": "Faraway",
+    "rating": 7.5,
+    "weight": 1.9,
+    "rank": 259,
+    "minPlaytime": 15,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Catch Up Games",
+    "year": "2023"
+  },
+  {
+    "id": "385761",
+    "name": "Faraway",
+    "rating": 7.5,
+    "weight": 1.9,
+    "rank": 259,
+    "minPlaytime": 15,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Catch Up Games",
+    "year": "2023"
+  },
+  {
+    "id": "425029",
+    "name": "Faraway: Le Peuple du Dessous",
+    "rating": 7.8,
+    "weight": 1.9,
+    "rank": null,
+    "minPlaytime": 25,
+    "maxPlaytime": 25,
+    "isExpansion": true,
+    "publisher": "Catch Up Games",
+    "year": "2024"
+  },
+  {
+    "id": "451708",
+    "name": "Faraway: Sous un ciel d'étoiles",
+    "rating": 7.8,
+    "weight": 2.0,
+    "rank": null,
+    "minPlaytime": 15,
+    "maxPlaytime": 30,
+    "isExpansion": true,
+    "publisher": "Catch Up Games",
+    "year": "2026"
+  },
+  {
+    "id": "347703",
+    "name": "First Rat",
+    "rating": 7.5,
+    "weight": 2.3,
+    "rank": 708,
+    "minPlaytime": 30,
+    "maxPlaytime": 75,
+    "isExpansion": false,
+    "publisher": "Geronimo Games",
+    "year": "2025"
+  },
+  {
+    "id": "336986",
+    "name": "Flamecraft",
+    "rating": 7.4,
+    "weight": 2.2,
+    "rank": 401,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Cardboard Alchemy",
+    "year": "2022"
+  },
+  {
+    "id": "420087",
+    "name": "Flip 7",
+    "rating": 7.2,
+    "weight": 1.0,
+    "rank": 516,
+    "minPlaytime": 20,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "Catch Up Games",
+    "year": "2025"
+  },
+  {
+    "id": "293275",
+    "name": "Flyin' Goblin",
+    "rating": 6.8,
+    "weight": 1.2,
+    "rank": 4527,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "IELLO",
+    "year": "2020"
+  },
+  {
+    "id": "431248",
+    "name": "For a Crown",
+    "rating": 7.0,
+    "weight": 1.4,
+    "rank": 3883,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Repos Production",
+    "year": "2025"
+  },
+  {
+    "id": "413416",
+    "name": "Garden Heist",
+    "rating": 7.0,
+    "weight": 1.0,
+    "rank": 17027,
+    "minPlaytime": 15,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "",
+    "year": ""
+  },
+  {
+    "id": "453526",
+    "name": "Got Five!",
+    "rating": 7.6,
+    "weight": 1.3,
+    "rank": 3233,
+    "minPlaytime": 15,
+    "maxPlaytime": 15,
+    "isExpansion": false,
+    "publisher": "",
+    "year": ""
+  },
+  {
+    "id": "319793",
+    "name": "Happy City",
+    "rating": 6.6,
+    "weight": 1.3,
+    "rank": 2869,
+    "minPlaytime": 20,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Cocktail Games",
+    "year": "2021"
+  },
+  {
+    "id": "414317",
+    "name": "Harmonies",
+    "rating": 8.0,
+    "weight": 2.0,
+    "rank": 55,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Libellud",
+    "year": "2024"
+  },
+  {
+    "id": "466234",
+    "name": "Harmonies: Pulse",
+    "rating": 8.1,
+    "weight": 0.0,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": true,
+    "publisher": "Libellud",
+    "year": "2026"
+  },
+  {
+    "id": "366013",
+    "name": "Heat",
+    "rating": 8.0,
+    "weight": 2.2,
+    "rank": 47,
+    "minPlaytime": 30,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Days of Wonder",
+    "year": "2022"
+  },
+  {
+    "id": "327711",
+    "name": "It's a Wonderful Kingdom",
+    "rating": 7.1,
+    "weight": 2.6,
+    "rank": 1498,
+    "minPlaytime": 45,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "La Boîte de Jeu",
+    "year": "2021"
+  },
+  {
+    "id": "204583",
+    "name": "Kingdomino",
+    "rating": 7.3,
+    "weight": 1.2,
+    "rank": 328,
+    "minPlaytime": 15,
+    "maxPlaytime": 25,
+    "isExpansion": false,
+    "publisher": "Blue Orange (EU)",
+    "year": "2017"
+  },
+  {
+    "id": "269526",
+    "name": "La vallée des vikings",
+    "rating": 6.6,
+    "weight": 1.3,
+    "rank": 4273,
+    "minPlaytime": 15,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "HABA",
+    "year": "2019"
+  },
+  {
+    "id": "429293",
+    "name": "Le Seigneur des Anneaux: La Communauté de l'Anneau, Le jeu de plis coopératif",
+    "rating": 8.0,
+    "weight": 1.9,
+    "rank": 144,
+    "minPlaytime": 20,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "Office Dog",
+    "year": "2025"
+  },
+  {
+    "id": "14996",
+    "name": "Les Aventuriers du Rail: Europe",
+    "rating": 7.5,
+    "weight": 1.9,
+    "rank": 179,
+    "minPlaytime": 30,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Days of Wonder",
+    "year": "2021"
+  },
+  {
+    "id": "409496",
+    "name": "Les Charlatans de Belcastel: le Duel",
+    "rating": 7.5,
+    "weight": 2.3,
+    "rank": 2850,
+    "minPlaytime": 45,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Schmidt Spiele",
+    "year": "2024"
+  },
+  {
+    "id": "448271",
+    "name": "Les Deux Tours, le jeu de plis coopératif",
+    "rating": 8.4,
+    "weight": 2.2,
+    "rank": 1344,
+    "minPlaytime": 20,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "Office Dog",
+    "year": "2026"
+  },
+  {
+    "id": "437334",
+    "name": "Les Jardins Suspendus",
+    "rating": 6.6,
+    "weight": 2.1,
+    "rank": 7083,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Gigamic",
+    "year": "2025"
+  },
+  {
+    "id": "312484",
+    "name": "Les Ruines Perdues de Narak",
+    "rating": 8.1,
+    "weight": 2.9,
+    "rank": 30,
+    "minPlaytime": 30,
+    "maxPlaytime": 120,
+    "isExpansion": false,
+    "publisher": "IELLO",
+    "year": "2021"
+  },
+  {
+    "id": "341254",
+    "name": "Les Ruines Perdues De Narak: Chefs d'Expédition",
+    "rating": 8.7,
+    "weight": 3.1,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 120,
+    "isExpansion": true,
+    "publisher": "IELLO",
+    "year": "2022"
+  },
+  {
+    "id": "382350",
+    "name": "Les Ruines Perdues de Narak: La Mission Disparue",
+    "rating": 8.7,
+    "weight": 3.2,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 120,
+    "isExpansion": true,
+    "publisher": "Czech Games Edition (CGE)",
+    "year": "2023"
+  },
+  {
+    "id": "439816",
+    "name": "Les Ruines Perdues de Narak: Sentiers Sinueux",
+    "rating": 8.7,
+    "weight": 3.4,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 120,
+    "isExpansion": true,
+    "publisher": "IELLO",
+    "year": "2026"
+  },
+  {
+    "id": "317504",
+    "name": "Mandala Stones",
+    "rating": 6.8,
+    "weight": 1.8,
+    "rank": 2506,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Board&Dice",
+    "year": "2021"
+  },
+  {
+    "id": "397431",
+    "name": "Moorland",
+    "rating": 7.1,
+    "weight": 2.3,
+    "rank": 5466,
+    "minPlaytime": 45,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Deep Print Games",
+    "year": "2024"
+  },
+  {
+    "id": "448428",
+    "name": "Moustache",
+    "rating": 7.2,
+    "weight": 1.3,
+    "rank": 7014,
+    "minPlaytime": 20,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "Lumberjacks Studio",
+    "year": "2025"
+  },
+  {
+    "id": "392023",
+    "name": "Mycelia",
+    "rating": 7.4,
+    "weight": 1.9,
+    "rank": 1398,
+    "minPlaytime": 45,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Ravensburger AG",
+    "year": "2023"
+  },
+  {
+    "id": "181304",
+    "name": "Mysterium",
+    "rating": 7.2,
+    "weight": 1.9,
+    "rank": 449,
+    "minPlaytime": 42,
+    "maxPlaytime": 42,
+    "isExpansion": false,
+    "publisher": "Libellud",
+    "year": "2025"
+  },
+  {
+    "id": "411875",
+    "name": "Pixies",
+    "rating": 7.1,
+    "weight": 1.2,
+    "rank": 1298,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Bombyx",
+    "year": "2024"
+  },
+  {
+    "id": "441707",
+    "name": "Pixies: Flower Power",
+    "rating": 7.6,
+    "weight": 1.8,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": true,
+    "publisher": "Bombyx",
+    "year": "2025"
+  },
+  {
+    "id": "234260",
+    "name": "Prey Another Day",
+    "rating": 6.8,
+    "weight": 1.1,
+    "rank": 2189,
+    "minPlaytime": 15,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "Blackrock Games",
+    "year": "2024"
+  },
+  {
+    "id": "417197",
+    "name": "Rebirth",
+    "rating": 7.8,
+    "weight": 2.0,
+    "rank": 395,
+    "minPlaytime": 45,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Lucky Duck Games",
+    "year": "2025"
+  },
+  {
+    "id": "307002",
+    "name": "Regicide",
+    "rating": 7.4,
+    "weight": 2.0,
+    "rank": 561,
+    "minPlaytime": 10,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Badgers from Mars",
+    "year": "2025"
+  },
+  {
+    "id": "291859",
+    "name": "Riftforce",
+    "rating": 7.1,
+    "weight": 2.1,
+    "rank": 1430,
+    "minPlaytime": 20,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "1 More Time Games",
+    "year": "2021"
+  },
+  {
+    "id": "367220",
+    "name": "Sea Salt & Paper",
+    "rating": 7.5,
+    "weight": 1.5,
+    "rank": 256,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Bombyx",
+    "year": "2024"
+  },
+  {
+    "id": "442250",
+    "name": "Sea Salt & Paper: Extra Pepper",
+    "rating": 8.0,
+    "weight": 1.4,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": true,
+    "publisher": "Bombyx",
+    "year": "2025"
+  },
+  {
+    "id": "396545",
+    "name": "Sea Salt & Paper: Extra Salt",
+    "rating": 7.8,
+    "weight": 1.4,
+    "rank": null,
+    "minPlaytime": 30,
+    "maxPlaytime": 45,
+    "isExpansion": true,
+    "publisher": "Bombyx",
+    "year": "2023"
+  },
+  {
+    "id": "204135",
+    "name": "Skyjo",
+    "rating": 6.6,
+    "weight": 1.1,
+    "rank": 1944,
+    "minPlaytime": 15,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Magilano",
+    "year": "2015"
+  },
+  {
+    "id": "301242",
+    "name": "Skyjo Action",
+    "rating": 6.2,
+    "weight": 1.2,
+    "rank": 7282,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Magilano",
+    "year": "2020"
+  },
+  {
+    "id": "338960",
+    "name": "Slay the Spire: The Board Game",
+    "rating": 8.6,
+    "weight": 2.9,
+    "rank": 16,
+    "minPlaytime": 30,
+    "maxPlaytime": 150,
+    "isExpansion": false,
+    "publisher": "",
+    "year": ""
+  },
+  {
+    "id": "293296",
+    "name": "Splendor: Marvel",
+    "rating": 7.6,
+    "weight": 1.8,
+    "rank": 582,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Space Cowboys",
+    "year": "2020"
+  },
+  {
+    "id": "312267",
+    "name": "Star Wars: Unlock!",
+    "rating": 7.0,
+    "weight": 1.9,
+    "rank": 1537,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Space Cowboys",
+    "year": "2020"
+  },
+  {
+    "id": "294448",
+    "name": "Tea for 2",
+    "rating": 6.5,
+    "weight": 1.5,
+    "rank": 4825,
+    "minPlaytime": 20,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Space Cowboys",
+    "year": "2020"
+  },
+  {
+    "id": "324856",
+    "name": "The Crew: Mission Sous-Marine",
+    "rating": 8.0,
+    "weight": 2.0,
+    "rank": 43,
+    "minPlaytime": 20,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "IELLO",
+    "year": "2023"
+  },
+  {
+    "id": "244992",
+    "name": "The Mind",
+    "rating": 6.7,
+    "weight": 1.1,
+    "rank": 1122,
+    "minPlaytime": 20,
+    "maxPlaytime": 20,
+    "isExpansion": false,
+    "publisher": "Oya",
+    "year": "2018"
+  },
+  {
+    "id": "434654",
+    "name": "Toy Battle",
+    "rating": 7.8,
+    "weight": 1.5,
+    "rank": 347,
+    "minPlaytime": 15,
+    "maxPlaytime": 15,
+    "isExpansion": false,
+    "publisher": "Repos Production",
+    "year": "2025"
+  },
+  {
+    "id": "244522",
+    "name": "Très Futé!",
+    "rating": 7.5,
+    "weight": 1.9,
+    "rank": 207,
+    "minPlaytime": 30,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Schmidt Spiele",
+    "year": "2018"
+  },
+  {
+    "id": "294612",
+    "name": "Unlock!: Epic Adventures",
+    "rating": 7.7,
+    "weight": 2.1,
+    "rank": 964,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Space Cowboys",
+    "year": "2019"
+  },
+  {
+    "id": "302425",
+    "name": "Unlock!: Mythic Adventures",
+    "rating": 7.6,
+    "weight": 2.2,
+    "rank": 1354,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Space Cowboys",
+    "year": "2020"
+  },
+  {
+    "id": "399088",
+    "name": "UNO: Show 'Em No Mercy",
+    "rating": 6.1,
+    "weight": 1.5,
+    "rank": 7962,
+    "minPlaytime": 15,
+    "maxPlaytime": 30,
+    "isExpansion": false,
+    "publisher": "Mattel, Inc.",
+    "year": "2023"
+  },
+  {
+    "id": "334065",
+    "name": "Verdant",
+    "rating": 7.3,
+    "weight": 2.1,
+    "rank": 760,
+    "minPlaytime": 45,
+    "maxPlaytime": 60,
+    "isExpansion": false,
+    "publisher": "Alderac Entertainment Group",
+    "year": "2023"
+  },
+  {
+    "id": "396618",
+    "name": "Waterfall Park",
+    "rating": 7.0,
+    "weight": 1.9,
+    "rank": 3160,
+    "minPlaytime": 45,
+    "maxPlaytime": 45,
+    "isExpansion": false,
+    "publisher": "Repos Production",
+    "year": "2023"
+  },
+  {
+    "id": "424219",
+    "name": "Zenith",
+    "rating": 8.0,
+    "weight": 2.3,
+    "rank": 589,
+    "minPlaytime": 25,
+    "maxPlaytime": 35,
+    "isExpansion": false,
+    "publisher": "PlayPunk",
+    "year": "2025"
+  },
+  {
+    "id": "453941",
+    "name": "Zenith: Secret Agents",
+    "rating": 7.9,
+    "weight": 2.0,
+    "rank": null,
+    "minPlaytime": 25,
+    "maxPlaytime": 35,
+    "isExpansion": true,
+    "publisher": "PlayPunk",
+    "year": "2025"
+  },
+  {
+    "id": "176189",
+    "name": "Zombicide: Black Plague",
+    "rating": 7.6,
+    "weight": 2.5,
+    "rank": 290,
+    "minPlaytime": 60,
+    "maxPlaytime": 180,
+    "isExpansion": false,
+    "publisher": "Edge Entertainment",
+    "year": "2016"
+  },
+  {
+    "id": "179538",
+    "name": "Zombicide: Black Plague – NPC-1: Notorious Plagued Characters",
+    "rating": 7.7,
+    "weight": 2.0,
+    "rank": null,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": true,
+    "publisher": "CMON Global Limited",
+    "year": "0"
+  },
+  {
+    "id": "179539",
+    "name": "Zombicide: Black Plague – NPC-2: Notorious Plagued Characters",
+    "rating": 7.6,
+    "weight": 2.0,
+    "rank": null,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": true,
+    "publisher": "Cool Mini Or Not",
+    "year": "0"
+  },
+  {
+    "id": "178485",
+    "name": "Zombicide: Black Plague – Wulfsburg",
+    "rating": 8.0,
+    "weight": 2.5,
+    "rank": null,
+    "minPlaytime": 60,
+    "maxPlaytime": 60,
+    "isExpansion": true,
+    "publisher": "Cool Mini Or Not",
+    "year": "2016"
+  },
+  {
+    "id": "279537",
+    "name": "À la Recherche de la Planète X",
+    "rating": 7.9,
+    "weight": 2.4,
+    "rank": 116,
+    "minPlaytime": 60,
+    "maxPlaytime": 75,
+    "isExpansion": false,
+    "publisher": "Foxtrot Games",
+    "year": "2021"
+  }
+];
+
 const EMOJIS = ['🧙','🧝','🧛','🧟','👸','🤴','🦸','🦹','🐉','🦁','🐺','🦊','🐻','🦖','🧙‍♀️','👻','🤖','🎩'];
 const COLORS = ['#7c6af7','#f7a26a','#6af7a2','#f76a6a','#6acff7','#f76aec','#f7e76a','#a26af7'];
-const BGG_USER = 'evilbreath';
 const FICHE_STORAGE_KEY = 'fiches_v1';
-const GAMES_CACHE_KEY = 'bgg_games_v1';
+const CUSTOM_GAMES_KEY = 'custom_games_v1'; // jeux ajoutés à la main, en plus de la liste embarquée
 
 // ══════════════════════════════════════════════════════
 //  STATE
@@ -455,7 +1747,7 @@ let tmpEmoji = EMOJIS[0];
 let tmpColor = COLORS[0];
 let gameStartTs = null;
 
-let allGames = [];       // { id, name, thumbnail, minPlayers, maxPlayers, playingTime, yearPublished }
+let allGames = [];       // { id, name, weight, rating, rank, minPlaytime, maxPlaytime, publisher, year, isExpansion, custom? }
 let fiches = {};         // { [gameId]: { steps:[], actions:[], notes:'' } }
 let editingGameId = null;
 let tmpSteps = [];
@@ -735,148 +2027,27 @@ function resetFromFinished() {
 }
 
 // ══════════════════════════════════════════════════════
-//  BGG COLLECTION
+//  COLLECTION DE JEUX (liste statique embarquée + ajouts manuels)
 // ══════════════════════════════════════════════════════
-async function loadGames() {
-  // Try cache first
-  try {
-    const cached = localStorage.getItem(GAMES_CACHE_KEY);
-    if (cached) {
-      const { ts, data } = JSON.parse(cached);
-      if (Date.now() - ts < 24*3600*1000) { // 24h cache
-        allGames = data;
-        renderGamesList();
-        return;
-      }
-    }
-  } catch(e) {}
-  await fetchBGGCollection();
+// La liste STATIC_GAMES vient d'un export CSV de la collection BGG de Ludovic,
+// intégrée directement dans l'app : plus aucune requête réseau nécessaire,
+// donc plus aucune dépendance à la fiabilité de l'API BGG ou de proxys CORS.
+// Les jeux ajoutés à la main (bouton "+") sont stockés séparément en local
+// et fusionnés à l'affichage avec la liste statique.
+
+function loadCustomGames() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_GAMES_KEY)) || []; } catch(e) { return []; }
+}
+function saveCustomGames(list) {
+  localStorage.setItem(CUSTOM_GAMES_KEY, JSON.stringify(list));
 }
 
-async function reloadGames() {
-  localStorage.removeItem(GAMES_CACHE_KEY);
-  document.getElementById('games-list').innerHTML = '<div class="loading-msg"><span class="loading-spinner">⚙️</span>Rechargement…</div>';
-  await fetchBGGCollection();
-}
-
-// ──────────────────────────────────────────────────────
-// Stratégie de chargement BGG, en cascade :
-//   1) Wrapper JSON non-officiel (bgg-json.azurewebsites.net) qui supporte
-//      CORS nativement → pas besoin de proxy, le plus simple et le plus rapide.
-//   2) Si indisponible (le service est peu fiable, hébergé en gratuit) :
-//      on retombe sur l'API XML officielle de BGG via des proxys CORS publics,
-//      en testant plusieurs proxys car ils sont eux-mêmes instables.
-// ──────────────────────────────────────────────────────
-
-const CORS_PROXIES = [
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-];
-
-async function fetchWithProxies(targetUrl, { retryOn202 = false } = {}) {
-  let lastErr = null;
-  for (const buildProxyUrl of CORS_PROXIES) {
-    try {
-      const proxyUrl = buildProxyUrl(targetUrl);
-      let res = await fetch(proxyUrl);
-      if (retryOn202) {
-        let tries = 0;
-        while (res.status === 202 && tries < 5) {
-          await new Promise(r => setTimeout(r, 3000));
-          res = await fetch(proxyUrl);
-          tries++;
-        }
-      }
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const txt = await res.text();
-      if (!txt || txt.length < 20) throw new Error('Réponse vide');
-      return txt;
-    } catch (e) {
-      lastErr = e;
-      continue; // essaie le proxy suivant
-    }
-  }
-  throw lastErr || new Error('Tous les proxys ont échoué');
-}
-
-// Tentative 1 : wrapper JSON natif (CORS déjà géré côté serveur, pas de proxy requis)
-async function tryFetchViaJsonWrapper() {
-  const url = `https://bgg-json.azurewebsites.net/collection/${BGG_USER}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const data = await res.json();
-  if (!Array.isArray(data) || !data.length) throw new Error('Collection vide ou format inattendu');
-  return data.map(g => ({
-    id: String(g.gameId ?? g.id ?? g.objectId ?? ''),
-    name: g.name || '?',
-    thumbnail: g.thumbnail || g.image || '',
-    minPlayers: g.minPlayers ?? '?',
-    maxPlayers: g.maxPlayers ?? '?',
-    playingTime: g.playingTime ?? g.maxPlayTime ?? '?',
-    yearPublished: g.yearPublished || '',
-  })).filter(g => g.id);
-}
-
-// Tentative 2 : API XML officielle via proxy CORS
-async function tryFetchViaXmlProxy() {
-  const url = `https://boardgamegeek.com/xmlapi2/collection?username=${BGG_USER}&own=1&subtype=boardgame&stats=1&excludesubtype=boardgameexpansion`;
-  const txt = await fetchWithProxies(url, { retryOn202: true });
-  const parser = new DOMParser();
-  const xml = parser.parseFromString(txt, 'text/xml');
-  const items = xml.querySelectorAll('item');
-  if (!items.length) throw new Error('Aucun jeu trouvé dans la réponse XML');
-  const games = [];
-  items.forEach(item => {
-    const name = item.querySelector('name')?.textContent || '?';
-    const thumb = item.querySelector('thumbnail')?.textContent || '';
-    const stats = item.querySelector('stats');
-    games.push({
-      id: item.getAttribute('objectid'),
-      name,
-      thumbnail: thumb.startsWith('//') ? 'https:'+thumb : thumb,
-      minPlayers: stats?.getAttribute('minplayers') || '?',
-      maxPlayers: stats?.getAttribute('maxplayers') || '?',
-      playingTime: stats?.getAttribute('playingtime') || '?',
-      yearPublished: item.querySelector('yearpublished')?.textContent || '',
-    });
-  });
-  return games;
-}
-
-async function fetchBGGCollection() {
-  let games = null;
-  let lastErr = null;
-
-  try {
-    games = await tryFetchViaJsonWrapper();
-  } catch (e) {
-    console.warn('Wrapper JSON BGG indisponible, tentative via proxy XML…', e);
-    lastErr = e;
-  }
-
-  if (!games) {
-    try {
-      games = await tryFetchViaXmlProxy();
-    } catch (e) {
-      console.error('Proxy XML aussi en échec:', e);
-      lastErr = e;
-    }
-  }
-
-  if (!games) {
-    document.getElementById('games-list').innerHTML = `
-      <div class="loading-msg">
-        <div style="font-size:2rem;margin-bottom:10px">😕</div>
-        <div style="margin-bottom:8px">Impossible de charger la collection BGG pour le moment.</div>
-        <div style="font-size:.8rem;margin-bottom:14px">Les services utilisés pour contourner les restrictions de BGG sont parfois temporairement indisponibles. Réessaie dans une minute.</div>
-        <button class="btn btn-secondary btn-sm" onclick="reloadGames()">Réessayer</button>
-      </div>`;
-    return;
-  }
-
-  allGames = games.sort((a,b) => a.name.localeCompare(b.name, 'fr'));
-  localStorage.setItem(GAMES_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: allGames }));
+function loadGames() {
+  const custom = loadCustomGames().map(g => ({ ...g, custom: true }));
+  // On exclut les extensions par défaut de la liste principale : un jeu d'extension
+  // seul n'a pas vraiment de sens à lancer ("on joue à Akropolis: Panthéon ce soir ?").
+  const base = STATIC_GAMES.filter(g => !g.isExpansion);
+  allGames = [...base, ...custom].sort((a,b) => a.name.localeCompare(b.name, 'fr'));
   renderGamesList();
 }
 
@@ -885,54 +2056,54 @@ function renderGamesList(filter='') {
   const q = filter.toLowerCase();
   const games = allGames.filter(g => g.name.toLowerCase().includes(q));
   if (!games.length) {
-    list.innerHTML = '<div class="loading-msg">Aucun jeu trouvé.</div>';
+    list.innerHTML = `<div class="loading-msg">Aucun jeu trouvé.${filter ? '' : ' Ajoute ton premier jeu avec le bouton +.'}</div>`;
     return;
   }
   fiches = loadFiches();
   list.innerHTML = games.map(g => {
     const f = fiches[g.id];
     const hasFiche = f && (f.steps?.length || f.actions?.length || f.notes);
+    const duration = g.minPlaytime && g.maxPlaytime
+      ? (g.minPlaytime === g.maxPlaytime ? `${g.minPlaytime} min` : `${g.minPlaytime}–${g.maxPlaytime} min`)
+      : (g.playingTime ? `${g.playingTime} min` : '');
+    const weightLabel = g.weight ? weightToLabel(g.weight) : '';
     return `
     <div class="game-row" id="grow-${g.id}" onclick="toggleGameRow('${g.id}')">
       <div class="game-row-header">
-        ${g.thumbnail
-          ? `<img class="game-thumb" src="${g.thumbnail}" alt="" loading="lazy" onerror="this.style.display='none'">`
-          : `<div class="game-thumb-ph">🎲</div>`}
+        <div class="game-thumb-ph">${g.custom ? '✏️' : '🎲'}</div>
         <div class="game-info">
           <div class="game-name">${g.name}</div>
-          <div class="game-meta">${g.minPlayers}–${g.maxPlayers} joueurs · ${g.playingTime} min${hasFiche?' · <span style="color:var(--success)">✓ fiche</span>':''}</div>
+          <div class="game-meta">${duration}${weightLabel ? ' · '+weightLabel : ''}${hasFiche?' · <span style="color:var(--success)">✓ fiche</span>':''}</div>
         </div>
         <span class="game-chevron">▶</span>
       </div>
       <div class="game-fiche" id="fiche-${g.id}">
+        ${renderGameDetails(g)}
         ${renderFicheContent(g.id, g.name)}
+        ${g.custom ? `<button class="fiche-edit-btn" style="color:var(--danger);border-color:var(--danger)" onclick="deleteCustomGame('${g.id}');event.stopPropagation()">🗑 Supprimer ce jeu</button>` : ''}
       </div>
     </div>`;
-  }).join('') + `<div class="bgg-badge">Collection chargée depuis <a href="https://boardgamegeek.com/user/${BGG_USER}" target="_blank">BGG</a></div>`;
+  }).join('');
 }
 
-function renderFicheContent(id, name) {
-  const f = fiches[id];
-  if (!f || (!f.steps?.length && !f.actions?.length && !f.notes)) {
-    return `<div style="padding:8px 0;color:var(--muted);font-size:.88rem">Pas encore de fiche pour ce jeu.</div>
-      <button class="fiche-edit-btn" onclick="openFicheEditor('${id}','${name.replace(/'/g,"\\'")}');event.stopPropagation()">✏️ Créer la fiche</button>`;
-  }
-  let html = '';
-  if (f.steps?.length) {
-    html += `<div class="fiche-section"><div class="fiche-label">Ordre du tour</div><div class="fiche-steps">`;
-    f.steps.forEach((s,i)=>{ html+=`<div class="fiche-step"><span class="step-num">${i+1}</span><span class="step-txt">${s}</span></div>`; });
-    html += '</div></div>';
-  }
-  if (f.actions?.length) {
-    html += `<div class="fiche-section"><div class="fiche-label">Actions possibles</div><div class="fiche-actions">`;
-    f.actions.forEach(a=>{ html+=`<span class="action-chip">${a}</span>`; });
-    html += '</div></div>';
-  }
-  if (f.notes) {
-    html += `<div class="fiche-section"><div class="fiche-label">Notes</div><div class="fiche-notes">${f.notes}</div></div>`;
-  }
-  html += `<button class="fiche-edit-btn" onclick="openFicheEditor('${id}','${name.replace(/'/g,"\\'")}');event.stopPropagation()">✏️ Modifier la fiche</button>`;
-  return html;
+// Convertit le poids BGG (1-5) en repère simple et parlant
+function weightToLabel(w) {
+  if (w < 1.8) return '🟢 léger';
+  if (w < 2.6) return '🟡 moyen';
+  if (w < 3.4) return '🟠 corsé';
+  return '🔴 expert';
+}
+
+// Détails secondaires (note, rang, éditeur) affichés uniquement une fois la fiche dépliée
+function renderGameDetails(g) {
+  if (g.custom) return '';
+  const bits = [];
+  if (g.rating) bits.push(`⭐ ${g.rating}/10`);
+  if (g.rank) bits.push(`#${g.rank} BGG`);
+  if (g.publisher) bits.push(g.publisher);
+  if (g.year) bits.push(g.year);
+  if (!bits.length) return '';
+  return `<div style="font-size:.78rem;color:var(--muted);padding:10px 0 2px;border-bottom:1px solid var(--border);margin-bottom:4px">${bits.join(' · ')}</div>`;
 }
 
 function toggleGameRow(id) {
@@ -942,6 +2113,13 @@ function toggleGameRow(id) {
 
 function filterGames() {
   renderGamesList(document.getElementById('search-input').value);
+}
+
+function deleteCustomGame(id) {
+  if (!confirm('Supprimer ce jeu de la liste ?')) return;
+  const custom = loadCustomGames().filter(g => g.id !== id);
+  saveCustomGames(custom);
+  loadGames();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1017,6 +2195,31 @@ function saveFiche() {
 // ══════════════════════════════════════════════════════
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openAddGame() {
+  document.getElementById('game-input-name').value = '';
+  document.getElementById('game-input-duration').value = '';
+  openModal('game-modal');
+  setTimeout(()=>document.getElementById('game-input-name').focus(), 300);
+}
+
+function saveCustomGame() {
+  const name = document.getElementById('game-input-name').value.trim();
+  if (!name) return;
+  const duration = parseInt(document.getElementById('game-input-duration').value) || null;
+  const custom = loadCustomGames();
+  const id = 'custom_' + Date.now();
+  custom.push({
+    id, name,
+    minPlaytime: duration, maxPlaytime: duration,
+    weight: null, rating: null, rank: null, publisher: '', year: '',
+    isExpansion: false,
+  });
+  saveCustomGames(custom);
+  closeModal('game-modal');
+  loadGames();
+  document.getElementById('search-input').value = '';
+}
 
 function renderEmojiGrid() {
   document.getElementById('emoji-grid').innerHTML = EMOJIS.map(e=>
