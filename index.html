@@ -65,16 +65,32 @@
     .setup-title { font-size:1.5rem; font-weight:700; color:var(--accent); }
     .setup-sub { color:var(--muted); font-size:.88rem; text-align:center; }
     .setup-section { width:100%; max-width:400px; }
+    .game-select-input {
+      width:100%; background:var(--surface); border:1.5px solid var(--border); border-radius:12px;
+      padding:11px 14px; color:var(--text); font-family:'Space Grotesk',sans-serif; font-size:.95rem;
+    }
+    .game-select-input:focus { outline:none; border-color:var(--accent); }
     .section-label { font-size:.75rem; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin-bottom:8px; }
     .setup-players-list { display:flex; flex-direction:column; gap:7px; margin-bottom:8px; }
     .setup-player-item {
       background:var(--surface); border:1.5px solid var(--border); border-radius:13px;
       padding:11px 14px; display:flex; align-items:center; gap:11px;
+      transition:opacity .15s, border-color .15s;
     }
+    .setup-player-item.dragging { opacity:.92; border-color:var(--accent); box-shadow:0 8px 24px rgba(0,0,0,.4); }
+    .setup-player-item .sp-drag-handle { color:var(--muted); font-size:1.1rem; cursor:grab; flex-shrink:0; touch-action:none; }
     .setup-player-item .sp-avatar { font-size:1.4rem; }
     .setup-player-item .sp-name { flex:1; font-weight:600; }
     .setup-player-item .sp-del { background:none; border:none; color:var(--muted); font-size:1.1rem; cursor:pointer; padding:4px; }
     .setup-player-item .sp-del:active { color:var(--danger); }
+    .sp-first-check {
+      display:flex; align-items:center; gap:4px; flex-shrink:0; cursor:pointer;
+      padding:5px 9px; border-radius:8px; background:var(--bg); border:1px solid var(--border);
+    }
+    .sp-first-check input[type="radio"] { accent-color:var(--accent); width:15px; height:15px; cursor:pointer; }
+    .sp-first-label { font-size:.7rem; color:var(--muted); letter-spacing:.03em; }
+    .sp-first-check.checked { border-color:var(--accent); background:rgba(124,106,247,.12); }
+    .sp-first-check.checked .sp-first-label { color:var(--accent); font-weight:700; }
     .time-options { display:flex; gap:8px; flex-wrap:wrap; }
     .time-opt {
       background:var(--surface); border:1.5px solid var(--border); border-radius:10px;
@@ -109,7 +125,7 @@
       display:flex; align-items:center; justify-content:space-between;
       padding:12px 16px 10px; border-bottom:1px solid var(--border); flex-shrink:0;
     }
-    .game-header h1 { font-size:1rem; font-weight:700; color:var(--accent); }
+    .game-header h1 { font-size:1rem; font-weight:700; color:var(--accent); flex:1; }
     .game-header h1 span { color:var(--text); }
     .tour-bar {
       display:flex; align-items:center; justify-content:center; gap:14px;
@@ -163,6 +179,38 @@
     }
     .search-bar:focus { outline:none; border-color:var(--accent); }
     .games-list { flex:1; overflow-y:auto; padding:0 12px 20px; }
+
+    /* ── STATS PAGE ── */
+    .stats-page-scroll { flex:1; overflow-y:auto; padding:14px 16px 24px; }
+    .stats-section { margin-bottom:22px; }
+    .stats-section-title { font-size:.78rem; color:var(--accent); font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:10px; }
+    .stats-empty { text-align:center; padding:30px 20px; color:var(--muted); font-size:.88rem; }
+    .leaderboard-row {
+      display:flex; align-items:center; gap:11px; background:var(--surface);
+      border:1.5px solid var(--border); border-radius:13px; padding:11px 14px; margin-bottom:7px;
+    }
+    .leaderboard-rank { font-size:.85rem; color:var(--muted); font-weight:700; width:20px; flex-shrink:0; }
+    .leaderboard-avatar { font-size:1.3rem; flex-shrink:0; }
+    .leaderboard-info { flex:1; min-width:0; }
+    .leaderboard-name { font-weight:700; font-size:.92rem; }
+    .leaderboard-sub { font-size:.72rem; color:var(--muted); }
+    .leaderboard-value { font-family:'Space Mono',monospace; font-weight:700; font-size:.95rem; color:var(--accent2); flex-shrink:0; }
+    .history-card {
+      background:var(--surface); border:1.5px solid var(--border); border-radius:14px;
+      padding:13px 16px; margin-bottom:9px;
+    }
+    .history-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+    .history-game-name { font-weight:700; font-size:.95rem; }
+    .history-game-name a { color:inherit; text-decoration:none; }
+    .history-game-name a:active { color:var(--accent); }
+    .history-date { font-size:.72rem; color:var(--muted); margin-top:2px; }
+    .history-duration { font-family:'Space Mono',monospace; font-size:.85rem; color:var(--accent2); flex-shrink:0; }
+    .history-players { display:flex; flex-wrap:wrap; gap:6px; }
+    .history-player-chip {
+      display:flex; align-items:center; gap:5px; background:var(--surface2);
+      border-radius:8px; padding:5px 10px; font-size:.78rem;
+    }
+    .history-player-chip .hp-time { font-family:'Space Mono',monospace; color:var(--muted); }
     .game-row {
       background:var(--surface); border:1.5px solid var(--border); border-radius:14px;
       margin-bottom:8px; overflow:hidden; cursor:pointer;
@@ -278,6 +326,9 @@
   <div class="nav-tab" onclick="switchTab('fiches')" id="tab-fiches">
     <span class="tab-icon">📋</span>Fiches
   </div>
+  <div class="nav-tab" onclick="switchTab('stats')" id="tab-stats">
+    <span class="tab-icon">📊</span>Stats
+  </div>
 </nav>
 
 <!-- ═══ PAGE CONFIG ═══ -->
@@ -285,6 +336,13 @@
   <div class="setup-inner">
     <div class="setup-title">🎲 Timer Jeu</div>
     <div class="setup-sub">Configure ta partie avant de jouer</div>
+
+    <div class="setup-section">
+      <div class="section-label">Jeu (optionnel — pour l'historique et les stats)</div>
+      <select id="game-select" class="game-select-input">
+        <option value="">— Aucun jeu sélectionné —</option>
+      </select>
+    </div>
 
     <div class="setup-section">
       <div class="section-label">Joueurs</div>
@@ -338,6 +396,7 @@
 <div class="page" id="page-game">
   <div class="game-header">
     <h1>🎲 <span>Timer</span></h1>
+    <span id="wakelock-indicator" style="display:none;align-items:center;font-size:1rem;margin-right:2px" title=""></span>
     <div style="display:flex;gap:8px">
       <button class="icon-btn" id="sound-btn" onclick="toggleSound()" title="Son">🔊</button>
       <button class="icon-btn" onclick="testSounds()" title="Tester les bips">🔔</button>
@@ -381,6 +440,15 @@
   </div>
   <input class="search-bar" type="text" id="search-input" placeholder="🔍  Rechercher un jeu…" oninput="filterGames()">
   <div class="games-list" id="games-list"></div>
+</div>
+
+<!-- ═══ PAGE STATS ═══ -->
+<div class="page" id="page-stats">
+  <div class="fiches-header">
+    <h2>📊 Stats &amp; historique</h2>
+    <button class="icon-btn" onclick="confirmClearHistory()" title="Effacer l'historique">🗑</button>
+  </div>
+  <div class="stats-page-scroll" id="stats-page-content"></div>
 </div>
 
 <!-- ═══ MODAL: Joueur ═══ -->
@@ -1746,6 +1814,9 @@ let editingPlayerIdx = null;
 let tmpEmoji = EMOJIS[0];
 let tmpColor = COLORS[0];
 let gameStartTs = null;
+let firstPlayerIdx = 0; // index du joueur qui commencera la partie
+let pendingFirstIdx = null; // utilisé une seule fois au tout premier "Suivant" de la partie
+let selectedGameId = null; // jeu choisi pour cette partie (optionnel), pour l'historique et les stats
 
 let allGames = [];       // { id, name, weight, rating, rank, minPlaytime, maxPlaytime, publisher, year, isExpansion, custom? }
 let fiches = {};         // { [gameId]: { steps:[], actions:[], notes:'' } }
@@ -1761,32 +1832,144 @@ function switchTab(tab) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('page-' + tab).classList.add('active');
+  // L'écran ne doit rester allumé en continu que pendant l'écran Timer
+  if (tab === 'game') requestWakeLock();
+  else releaseWakeLock();
+  if (tab === 'stats') renderStatsPage();
 }
 
 // ══════════════════════════════════════════════════════
 //  SETUP
 // ══════════════════════════════════════════════════════
+const PLAYERS_STORAGE_KEY = 'players_v1';
+
+function genPlayerId() { return 'pl_' + Date.now() + '_' + Math.floor(Math.random()*10000); }
+
+function loadSavedPlayers() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PLAYERS_STORAGE_KEY));
+    if (Array.isArray(saved) && saved.length) return saved;
+  } catch(e) {}
+  return null;
+}
+
+function persistPlayersRoster() {
+  // On ne sauvegarde que l'identité (id, nom, emoji, couleur), pas l'état de partie en cours
+  const roster = players.map(p => ({ id:p.id, name:p.name, emoji:p.emoji, color:p.color }));
+  localStorage.setItem(PLAYERS_STORAGE_KEY, JSON.stringify(roster));
+}
+
 function initSetup() {
   if (players.length === 0) {
-    players = [
-      { name:'Moi',    emoji:'🧙', color:COLORS[0], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
-      { name:'Madame', emoji:'👸', color:COLORS[1], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
-      { name:'Petit',  emoji:'🦸', color:COLORS[2], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
-    ];
+    const saved = loadSavedPlayers();
+    if (saved) {
+      players = saved.map(p => ({ ...p, totalSec:0, elapsed:0, totalElapsedAllTurns:0 }));
+    } else {
+      players = [
+        { id:genPlayerId(), name:'Moi',    emoji:'🧙', color:COLORS[0], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
+        { id:genPlayerId(), name:'Madame', emoji:'👸', color:COLORS[1], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
+        { id:genPlayerId(), name:'Petit',  emoji:'🦸', color:COLORS[2], totalSec:0, elapsed:0, totalElapsedAllTurns:0 },
+      ];
+      persistPlayersRoster();
+    }
   }
   renderSetupList();
 }
 
 function renderSetupList() {
   document.getElementById('setup-list').innerHTML = players.map((p,i) => `
-    <div class="setup-player-item">
+    <div class="setup-player-item" id="setup-item-${i}" data-idx="${i}">
+      <span class="sp-drag-handle" onpointerdown="startDragPlayer(event, ${i})">⠿</span>
       <span class="sp-avatar">${p.emoji}</span>
       <span class="sp-name" style="color:${p.color}">${p.name}</span>
+      <label class="sp-first-check ${i===firstPlayerIdx?'checked':''}" title="Premier joueur">
+        <input type="radio" name="first-player" ${i===firstPlayerIdx?'checked':''} onclick="setFirstPlayer(${i})">
+        <span class="sp-first-label">1er</span>
+      </label>
       <button class="sp-del" onclick="removePlayer(${i})">✕</button>
     </div>`).join('');
 }
 
-function removePlayer(i) { players.splice(i,1); renderSetupList(); }
+function setFirstPlayer(i) {
+  firstPlayerIdx = i;
+  renderSetupList();
+}
+
+// ── Glisser-déposer tactile (Pointer Events : fonctionne au doigt comme à la souris) ──
+let dragState = null; // { srcIdx, el, startY, offsetY, itemHeight }
+
+function startDragPlayer(e, i) {
+  e.preventDefault();
+  const list = document.getElementById('setup-list');
+  const el = document.getElementById('setup-item-' + i);
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  dragState = {
+    srcIdx: i,
+    el,
+    startY: e.clientY,
+    elStartTop: rect.top,
+    itemHeight: rect.height + 7, // + gap
+    listRect: list.getBoundingClientRect(),
+  };
+  el.classList.add('dragging');
+  el.style.position = 'relative';
+  el.style.zIndex = '50';
+  document.addEventListener('pointermove', onDragPlayerMove);
+  document.addEventListener('pointerup', onDragPlayerEnd);
+}
+
+function onDragPlayerMove(e) {
+  if (!dragState) return;
+  const dy = e.clientY - dragState.startY;
+  dragState.el.style.transform = `translateY(${dy}px)`;
+  dragState.el.style.transition = 'none';
+
+  // Détermine la position cible en fonction du déplacement
+  const items = Array.from(document.querySelectorAll('.setup-player-item'));
+  const srcIdx = dragState.srcIdx;
+  let targetIdx = srcIdx;
+  const movedCenterY = dragState.elStartTop + dragState.el.offsetHeight/2 + dy;
+  items.forEach((it, idx) => {
+    if (it === dragState.el) return;
+    const r = it.getBoundingClientRect();
+    const center = r.top + r.height/2;
+    if (movedCenterY > center && idx > targetIdx) targetIdx = idx;
+    if (movedCenterY < center && idx < targetIdx) targetIdx = idx;
+  });
+  dragState.targetIdx = targetIdx;
+}
+
+function onDragPlayerEnd() {
+  if (!dragState) return;
+  const { srcIdx, targetIdx, el } = dragState;
+  el.style.transform = '';
+  el.style.position = '';
+  el.style.zIndex = '';
+  el.classList.remove('dragging');
+  document.removeEventListener('pointermove', onDragPlayerMove);
+  document.removeEventListener('pointerup', onDragPlayerEnd);
+
+  if (targetIdx !== undefined && targetIdx !== srcIdx) {
+    const moved = players.splice(srcIdx, 1)[0];
+    players.splice(targetIdx, 0, moved);
+    // Le "premier joueur" suit la même personne, pas le même index
+    if (firstPlayerIdx === srcIdx) firstPlayerIdx = targetIdx;
+    else if (srcIdx < firstPlayerIdx && targetIdx >= firstPlayerIdx) firstPlayerIdx--;
+    else if (srcIdx > firstPlayerIdx && targetIdx <= firstPlayerIdx) firstPlayerIdx++;
+    persistPlayersRoster();
+  }
+  dragState = null;
+  renderSetupList();
+}
+
+function removePlayer(i) {
+  if (firstPlayerIdx === i) firstPlayerIdx = 0;
+  else if (firstPlayerIdx > i) firstPlayerIdx--;
+  players.splice(i,1);
+  persistPlayersRoster();
+  renderSetupList();
+}
 
 function openAddPlayer() {
   editingPlayerIdx = null;
@@ -1801,9 +1984,14 @@ function openAddPlayer() {
 function savePlayer() {
   const name = document.getElementById('input-name').value.trim();
   if (!name) return;
-  const p = { name, emoji:tmpEmoji, color:tmpColor, totalSec:0, elapsed:0, totalElapsedAllTurns:0 };
-  if (editingPlayerIdx === null) players.push(p);
-  else players[editingPlayerIdx] = { ...players[editingPlayerIdx], ...p };
+  if (editingPlayerIdx === null) {
+    const p = { id:genPlayerId(), name, emoji:tmpEmoji, color:tmpColor, totalSec:0, elapsed:0, totalElapsedAllTurns:0 };
+    players.push(p);
+  } else {
+    // On garde le même id : changer le nom/emoji ne doit pas casser les stats passées
+    players[editingPlayerIdx] = { ...players[editingPlayerIdx], name, emoji:tmpEmoji, color:tmpColor };
+  }
+  persistPlayersRoster();
   closeModal('player-modal');
   renderSetupList();
 }
@@ -1848,9 +2036,14 @@ function startGame() {
     p.totalSec = selectedTime;   // capital (mode global) ou durée d'un tour (mode turn)
     p.elapsed = 0;                // temps écoulé sur le tour/le capital en cours
     p.totalElapsedAllTurns = 0;   // cumul indicatif (utilisé en mode turn)
+    p.turnsPlayed = 0;            // nombre de tours joués, pour calculer une moyenne/tour en fin de partie
   });
-  tourNum = 1; activeIdx = -1; paused = false;
+  tourNum = 1; paused = false;
+  activeIdx = -1; // en attente du premier clic sur "Suivant"
+  pendingFirstIdx = firstPlayerIdx;
   gameStartTs = Date.now();
+  const sel = document.getElementById('game-select');
+  selectedGameId = sel && sel.value ? sel.value : null;
   clearInterval(interval);
   switchTab('game');
   renderPlayers(); updateTourBar();
@@ -1897,28 +2090,38 @@ function fmtTime(s) {
 function setActive(i) {
   if (activeIdx===i) { togglePause(); return; }
   clearInterval(interval);
-  if (activeIdx !== -1 && timerMode === 'turn') {
+  if (activeIdx !== -1) {
     const prev = players[activeIdx];
-    prev.totalElapsedAllTurns += prev.elapsed;
-    prev.elapsed = 0;
+    prev.turnsPlayed = (prev.turnsPlayed||0) + 1;
+    if (timerMode === 'turn') {
+      prev.totalElapsedAllTurns += prev.elapsed;
+      prev.elapsed = 0;
+    }
   }
   activeIdx=i; paused=false;
+  pendingFirstIdx = null; // le joueur cliqué devient de facto le point de départ du décompte des tours
   startTick(); renderPlayers(); updateTourBar();
 }
 
 function nextPlayer() {
   clearInterval(interval);
-  // Avant de changer de joueur : si on était en mode "par tour", on archive le temps du tour
-  // écoulé dans le cumul indicatif, puis on remet le compteur de tour à zéro pour ce joueur.
-  if (activeIdx !== -1 && timerMode === 'turn') {
+  // Avant de changer de joueur : on compte ce tour comme joué, et si on était en mode
+  // "par tour", on archive le temps écoulé dans le cumul indicatif puis on le remet à zéro.
+  if (activeIdx !== -1) {
     const prev = players[activeIdx];
-    prev.totalElapsedAllTurns += prev.elapsed;
-    prev.elapsed = 0;
+    prev.turnsPlayed = (prev.turnsPlayed||0) + 1;
+    if (timerMode === 'turn') {
+      prev.totalElapsedAllTurns += prev.elapsed;
+      prev.elapsed = 0;
+    }
   }
-  if (activeIdx===-1) activeIdx=0;
-  else {
+  if (activeIdx===-1) {
+    // Tout premier "Suivant" de la partie : on respecte le joueur choisi comme premier
+    activeIdx = pendingFirstIdx !== null ? pendingFirstIdx : 0;
+    pendingFirstIdx = null;
+  } else {
     activeIdx=(activeIdx+1)%players.length;
-    if (activeIdx===0) { tourNum++; }
+    if (activeIdx===firstPlayerIdx) { tourNum++; } // un tour complet = retour au joueur de départ
   }
   paused=false; startTick(); renderPlayers(); updateTourBar();
   vibrate([40]);
@@ -1991,16 +2194,33 @@ function changeTour(d) { tourNum=Math.max(1,tourNum+d); document.getElementById(
 function resetConfirm() { if(confirm('Retourner à la config ?')) { clearInterval(interval); players.forEach(p=>{p.elapsed=0; p.totalElapsedAllTurns=0;}); switchTab('setup'); } }
 
 // ══════════════════════════════════════════════════════
-//  FIN DE PARTIE
+//  FIN DE PARTIE + HISTORIQUE
 // ══════════════════════════════════════════════════════
+const HISTORY_STORAGE_KEY = 'game_history_v1';
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY)) || []; } catch(e) { return []; }
+}
+function saveHistory(list) {
+  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(list));
+}
+
 function finishGame() {
   clearInterval(interval);
+  // On compte le tour en cours du joueur actif (pas encore comptabilisé tant qu'on n'a pas changé de joueur)
+  if (activeIdx !== -1) {
+    const active = players[activeIdx];
+    active.turnsPlayed = (active.turnsPlayed||0) + 1;
+    if (timerMode === 'turn') {
+      active.totalElapsedAllTurns += active.elapsed;
+    }
+  }
+
   // Calcule le temps total joué par chacun, quel que soit le mode
   const stats = players.map(p => {
-    const total = timerMode === 'turn'
-      ? p.totalElapsedAllTurns + p.elapsed
-      : p.elapsed; // mode global : temps déjà consommé sur le capital
-    return { ...p, totalPlayed: total };
+    const total = timerMode === 'turn' ? (p.totalElapsedAllTurns) : p.elapsed;
+    const turns = p.turnsPlayed || 0;
+    return { ...p, totalPlayed: total, turnsPlayed: turns, avgPerTurn: turns > 0 ? total/turns : 0 };
   });
   const maxTime = Math.max(1, ...stats.map(s => s.totalPlayed));
   document.getElementById('finished-sub').textContent =
@@ -2019,6 +2239,24 @@ function finishGame() {
         </div>
       </div>`).join('');
   document.getElementById('finished-overlay').classList.add('show');
+
+  // Enregistrement dans l'historique, pour les stats cumulées sur la durée
+  const game = selectedGameId ? allGames.find(g => g.id === selectedGameId) : null;
+  const durationSec = gameStartTs ? Math.round((Date.now() - gameStartTs) / 1000) : null;
+  const entry = {
+    ts: Date.now(),
+    gameId: selectedGameId || null,
+    gameName: game ? game.name : null,
+    mode: timerMode,
+    durationSec,
+    players: stats.map(s => ({
+      id: s.id, name: s.name, emoji: s.emoji,
+      totalPlayedSec: s.totalPlayed, turnsPlayed: s.turnsPlayed,
+    })),
+  };
+  const history = loadHistory();
+  history.unshift(entry); // les plus récentes en premier
+  saveHistory(history);
 }
 
 function closeFinished() {
@@ -2027,8 +2265,146 @@ function closeFinished() {
 
 function resetFromFinished() {
   closeFinished();
-  players.forEach(p => { p.elapsed = 0; p.totalElapsedAllTurns = 0; });
+  players.forEach(p => { p.elapsed = 0; p.totalElapsedAllTurns = 0; p.turnsPlayed = 0; });
   switchTab('setup');
+}
+
+// ══════════════════════════════════════════════════════
+//  PAGE STATS (historique + classements)
+// ══════════════════════════════════════════════════════
+function confirmClearHistory() {
+  if (!confirm('Effacer tout l\'historique des parties ? Cette action est irréversible.')) return;
+  saveHistory([]);
+  renderStatsPage();
+}
+
+function renderStatsPage() {
+  const el = document.getElementById('stats-page-content');
+  const history = loadHistory();
+
+  if (!history.length) {
+    el.innerHTML = `<div class="stats-empty">Aucune partie enregistrée pour l'instant.<br>Termine une partie depuis l'écran Timer (🏁) pour commencer à construire ton historique.</div>`;
+    return;
+  }
+
+  el.innerHTML =
+    renderLeaderboardsSection(history) +
+    renderHistorySection(history);
+}
+
+// ── Classements cumulés ──
+// On identifie chaque joueur par son ID stable (et non son nom), pour que les stats
+// restent fiables même si quelqu'un change de nom ou d'emoji entre deux parties.
+function renderLeaderboardsSection(history) {
+  // 1) Temps moyen par tour, PAR JEU (les tours n'ont pas la même nature selon le jeu)
+  //    structure: { gameKey: { gameName, players: { playerId: { name, emoji, totalSec, totalTurns } } } }
+  const perGame = {};
+  // 2) Temps total cumulé, toutes parties confondues, tous jeux confondus
+  const globalTotals = {}; // playerId -> { name, emoji, totalSec, gamesCount }
+
+  history.forEach(entry => {
+    const gameKey = entry.gameId || ('__nogame__:' + (entry.gameName || 'Partie libre'));
+    const gameName = entry.gameName || 'Partie libre (sans jeu choisi)';
+    if (!perGame[gameKey]) perGame[gameKey] = { gameName, gameId: entry.gameId, players: {} };
+
+    entry.players.forEach(p => {
+      // Par jeu
+      if (!perGame[gameKey].players[p.id]) {
+        perGame[gameKey].players[p.id] = { name:p.name, emoji:p.emoji, totalSec:0, totalTurns:0 };
+      }
+      perGame[gameKey].players[p.id].totalSec += p.totalPlayedSec || 0;
+      perGame[gameKey].players[p.id].totalTurns += p.turnsPlayed || 0;
+      // Toujours garder le nom/emoji le plus récent pour l'affichage
+      perGame[gameKey].players[p.id].name = p.name;
+      perGame[gameKey].players[p.id].emoji = p.emoji;
+
+      // Global
+      if (!globalTotals[p.id]) globalTotals[p.id] = { name:p.name, emoji:p.emoji, totalSec:0, gamesCount:0 };
+      globalTotals[p.id].totalSec += p.totalPlayedSec || 0;
+      globalTotals[p.id].gamesCount += 1;
+      globalTotals[p.id].name = p.name;
+      globalTotals[p.id].emoji = p.emoji;
+    });
+  });
+
+  // ── Classement global : temps total cumulé, toutes parties ──
+  const globalRanked = Object.values(globalTotals).sort((a,b) => b.totalSec - a.totalSec);
+  let html = `<div class="stats-section">
+    <div class="stats-section-title">⏱️ Temps total cumulé (toutes parties)</div>
+    ${globalRanked.map((p,i) => `
+      <div class="leaderboard-row">
+        <span class="leaderboard-rank">#${i+1}</span>
+        <span class="leaderboard-avatar">${p.emoji}</span>
+        <div class="leaderboard-info">
+          <div class="leaderboard-name">${p.name}</div>
+          <div class="leaderboard-sub">${p.gamesCount} partie${p.gamesCount>1?'s':''}</div>
+        </div>
+        <span class="leaderboard-value">${fmtTime(p.totalSec)}</span>
+      </div>`).join('')}
+  </div>`;
+
+  // ── Classements par jeu : temps moyen par tour ──
+  const gamesWithEnoughData = Object.entries(perGame)
+    .filter(([key, g]) => Object.values(g.players).some(p => p.totalTurns > 0))
+    .sort((a,b) => a[1].gameName.localeCompare(b[1].gameName, 'fr'));
+
+  if (gamesWithEnoughData.length) {
+    html += `<div class="stats-section">
+      <div class="stats-section-title">🎯 Temps moyen par tour, par jeu</div>`;
+    gamesWithEnoughData.forEach(([key, g]) => {
+      const ranked = Object.values(g.players)
+        .filter(p => p.totalTurns > 0)
+        .map(p => ({ ...p, avg: p.totalSec / p.totalTurns }))
+        .sort((a,b) => b.avg - a.avg); // le plus lent en premier (le plus "marquant" à voir)
+      if (!ranked.length) return;
+      html += `<div style="margin:10px 0 6px;font-size:.85rem;font-weight:700;color:var(--text)">${g.gameName}</div>`;
+      ranked.forEach((p,i) => {
+        const tag = i===0 ? '🐢 plus lent' : (i===ranked.length-1 ? '⚡ plus rapide' : '');
+        html += `
+        <div class="leaderboard-row">
+          <span class="leaderboard-avatar">${p.emoji}</span>
+          <div class="leaderboard-info">
+            <div class="leaderboard-name">${p.name}</div>
+            <div class="leaderboard-sub">${p.totalTurns} tour${p.totalTurns>1?'s':''} joué${p.totalTurns>1?'s':''}${tag ? ' · '+tag : ''}</div>
+          </div>
+          <span class="leaderboard-value">${fmtTime(Math.round(p.avg))}/tour</span>
+        </div>`;
+      });
+    });
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+// ── Historique chronologique des parties ──
+function renderHistorySection(history) {
+  let html = `<div class="stats-section">
+    <div class="stats-section-title">🗂️ Historique des parties</div>`;
+  history.forEach(entry => {
+    const date = new Date(entry.ts);
+    const dateStr = date.toLocaleDateString('fr-FR', { day:'numeric', month:'short', year:'numeric' }) +
+                    ' · ' + date.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+    const gameLabel = entry.gameId
+      ? `<a href="https://boardgamegeek.com/boardgame/${entry.gameId}" target="_blank" rel="noopener">${entry.gameName} ↗</a>`
+      : (entry.gameName || 'Partie libre');
+    const sortedPlayers = [...entry.players].sort((a,b) => b.totalPlayedSec - a.totalPlayedSec);
+    html += `
+      <div class="history-card">
+        <div class="history-card-header">
+          <div>
+            <div class="history-game-name">${gameLabel}</div>
+            <div class="history-date">${dateStr}</div>
+          </div>
+          ${entry.durationSec ? `<span class="history-duration">${fmtTime(entry.durationSec)}</span>` : ''}
+        </div>
+        <div class="history-players">
+          ${sortedPlayers.map(p => `<span class="history-player-chip">${p.emoji} ${p.name} <span class="hp-time">${fmtTime(p.totalPlayedSec)}</span></span>`).join('')}
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+  return html;
 }
 
 // ══════════════════════════════════════════════════════
@@ -2054,6 +2430,16 @@ function loadGames() {
   const base = STATIC_GAMES.filter(g => !g.isExpansion);
   allGames = [...base, ...custom].sort((a,b) => a.name.localeCompare(b.name, 'fr'));
   renderGamesList();
+  populateGameSelect();
+}
+
+function populateGameSelect() {
+  const sel = document.getElementById('game-select');
+  if (!sel) return;
+  const prevValue = sel.value;
+  sel.innerHTML = '<option value="">— Aucun jeu sélectionné —</option>' +
+    allGames.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+  if (prevValue && allGames.some(g => g.id === prevValue)) sel.value = prevValue;
 }
 
 function renderGamesList(filter='') {
@@ -2107,8 +2493,12 @@ function renderGameDetails(g) {
   if (g.rank) bits.push(`#${g.rank} BGG`);
   if (g.publisher) bits.push(g.publisher);
   if (g.year) bits.push(g.year);
-  if (!bits.length) return '';
-  return `<div style="font-size:.78rem;color:var(--muted);padding:10px 0 2px;border-bottom:1px solid var(--border);margin-bottom:4px">${bits.join(' · ')}</div>`;
+  const metaLine = bits.length
+    ? `<div style="font-size:.78rem;color:var(--muted);padding:10px 0 2px">${bits.join(' · ')}</div>` : '';
+  const bggLink = g.id
+    ? `<a href="https://boardgamegeek.com/boardgame/${g.id}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-block;font-size:.78rem;color:var(--accent);text-decoration:none;padding:2px 0 8px">📖 Voir la fiche sur BoardGameGeek ↗</a>` : '';
+  if (!metaLine && !bggLink) return '';
+  return `<div style="border-bottom:1px solid var(--border);margin-bottom:4px">${metaLine}${bggLink}</div>`;
 }
 
 // Contenu de la fiche de règles (étapes, actions, notes) ou invitation à la créer
@@ -2335,6 +2725,63 @@ function updateSoundBtn() {
   if (btn) btn.textContent = soundEnabled ? '🔊' : '🔇';
 }
 
+// ══════════════════════════════════════════════════════
+//  WAKE LOCK (garde l'écran allumé pendant l'écran Timer)
+// ══════════════════════════════════════════════════════
+let wakeLock = null;
+let wakeLockWanted = false; // reflète si on "devrait" être actif (pour ré-acquérir au retour au premier plan)
+
+async function requestWakeLock() {
+  wakeLockWanted = true;
+  if (!('wakeLock' in navigator)) {
+    updateWakeLockIndicator(false, true); // non supporté par ce navigateur
+    return;
+  }
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => {
+      // Le système peut libérer le lock tout seul (changement d'app, écran éteint…) ;
+      // wakeLockWanted reste true pour le redemander dès le retour au premier plan.
+      updateWakeLockIndicator(false);
+    });
+    updateWakeLockIndicator(true);
+  } catch (e) {
+    console.warn('Wake Lock refusé:', e);
+    updateWakeLockIndicator(false, true);
+  }
+}
+
+async function releaseWakeLock() {
+  wakeLockWanted = false;
+  if (wakeLock) {
+    try { await wakeLock.release(); } catch(e) {}
+    wakeLock = null;
+  }
+  updateWakeLockIndicator(false);
+}
+
+// Le navigateur libère automatiquement le wake lock quand l'app passe en arrière-plan ;
+// on le redemande donc dès que l'onglet redevient visible.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && wakeLockWanted) {
+    requestWakeLock();
+  }
+});
+
+function updateWakeLockIndicator(active, unsupported=false) {
+  const el = document.getElementById('wakelock-indicator');
+  if (!el) return;
+  if (unsupported) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.textContent = active ? '☀️' : '🌙';
+  el.title = active ? 'Écran maintenu allumé' : 'Écran non maintenu allumé (réessaiera automatiquement)';
+}
+
+// ══════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════
+function vibrate(p) { if('vibrate' in navigator) navigator.vibrate(p); }
+
 // Joue la séquence complète (warning 15s + 10s + décompte 5..1 + alarme finale) à la suite,
 // pour vérifier que tout s'entend bien sans attendre un vrai timer.
 function testSounds() {
@@ -2353,6 +2800,8 @@ function testSounds() {
 }
 
 
+
+window.addEventListener('beforeunload', () => { if (wakeLock) wakeLock.release().catch(()=>{}); });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
